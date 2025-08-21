@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./.env:/app/.env
+    depends_on:
+      - worker
+    command: ["python", "-m", "app.main"]
+
+  worker:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    command: ["python", "-m", "app.workers.websocket_worker"]
+
+volumes:
+  data:
+  reports:

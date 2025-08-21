@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">Backtest Trading Strategy</h1>
+        <p class="text-xl text-gray-600">Test your SMC strategy on historical data</p>
+    </div>
+
+    <!-- Backtest Form -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Strategy Parameters</h2>
+        
+        <form id="backtest-form" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Symbol Selection -->
+                <div>
+                    <label for="symbol" class="block text-sm font-medium text-gray-700 mb-2">
+                        Trading Pair
+                    </label>
+                    <select id="symbol" name="symbol" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select a trading pair</option>
+                    </select>
+                </div>
+
+                <!-- Timeframe Selection -->
+                <div>
+                    <label for="timeframe" class="block text-sm font-medium text-gray-700 mb-2">
+                        Timeframe
+                    </label>
+                    <select id="timeframe" name="timeframe" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select timeframe</option>
+                        <option value="1m">1 minute</option>
+                        <option value="5m">5 minutes</option>
+                        <option value="15m">15 minutes</option>
+                        <option value="30m">30 minutes</option>
+                        <option value="1h">1 hour</option>
+                        <option value="4h">4 hours</option>
+                        <option value="1d">1 day</option>
+                    </select>
+                </div>
+
+                <!-- Date Range -->
+                <div>
+                    <label for="from-date" class="block text-sm font-medium text-gray-700 mb-2">
+                        Start Date
+                    </label>
+                    <input type="date" id="from-date" name="from_date" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label for="to-date" class="block text-sm font-medium text-gray-700 mb-2">
+                        End Date
+                    </label>
+                    <input type="date" id="to-date" name="to_date" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Risk Parameters -->
+                <div>
+                    <label for="sl-percent" class="block text-sm font-medium text-gray-700 mb-2">
+                        Stop Loss (%)
+                    </label>
+                    <input type="number" id="sl-percent" name="sl_percent" value="2.0" step="0.1" min="0.1" max="10" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label for="tp-percent" class="block text-sm font-medium text-gray-700 mb-2">
+                        Take Profit (%)
+                    </label>
+                    <input type="number" id="tp-percent" name="tp_percent" value="4.0" step="0.1" min="0.1" max="20" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="text-center">
+                <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+                    Run Backtest
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="hidden">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Backtest Results</h2>
+            
+            <!-- Loading State -->
+            <div id="loading-results" class="text-center py-8 hidden">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="text-gray-500 mt-4">Running backtest simulation...</p>
+            </div>
+
+            <!-- Results Content -->
+            <div id="results-content" class="hidden">
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-blue-50 rounded-lg p-4 text-center">
+                        <p class="text-sm font-medium text-blue-600">Total Trades</p>
+                        <p class="text-2xl font-bold text-blue-900" id="total-trades">-</p>
+                    </div>
+                    
+                    <div class="bg-green-50 rounded-lg p-4 text-center">
+                        <p class="text-sm font-medium text-green-600">Win Rate</p>
+                        <p class="text-2xl font-bold text-green-900" id="win-rate">-</p>
+                    </div>
+                    
+                    <div class="bg-purple-50 rounded-lg p-4 text-center">
+                        <p class="text-sm font-medium text-purple-600">Profit Factor</p>
+                        <p class="text-2xl font-bold text-purple-900" id="profit-factor">-</p>
+                    </div>
+                    
+                    <div class="bg-orange-50 rounded-lg p-4 text-center">
+                        <p class="text-sm font-medium text-orange-600">Avg R</p>
+                        <p class="text-2xl font-bold text-orange-900" id="avg-r">-</p>
+                    </div>
+                </div>
+
+                <!-- Detailed Metrics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Performance Metrics</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Expectancy:</span>
+                                <span class="font-medium" id="expectancy">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Max Drawdown (R):</span>
+                                <span class="font-medium" id="max-drawdown">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Sharpe-like Ratio:</span>
+                                <span class="font-medium" id="sharpe-like">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Time in Market:</span>
+                                <span class="font-medium" id="time-in-market">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-medium text-gray-900 mb-3">Strategy Parameters</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Symbol:</span>
+                                <span class="font-medium" id="result-symbol">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Timeframe:</span>
+                                <span class="font-medium" id="result-timeframe">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Period:</span>
+                                <span class="font-medium" id="result-period">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Stop Loss:</span>
+                                <span class="font-medium" id="result-sl">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Take Profit:</span>
+                                <span class="font-medium" id="result-tp">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CSV Download -->
+                <div class="text-center">
+                    <a id="csv-download" href="#" target="_blank" 
+                       class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Download CSV Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Load available pairs on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAvailablePairs();
+        setDefaultDates();
+    });
+
+    // Set default date range (last 30 days)
+    function setDefaultDates() {
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+        
+        document.getElementById('to-date').value = today.toISOString().split('T')[0];
+        document.getElementById('from-date').value = thirtyDaysAgo.toISOString().split('T')[0];
+    }
+
+    // Load available pairs
+    async function loadAvailablePairs() {
+        try {
+            const response = await fetch('/api/v1/pairs/');
+            const pairs = await response.json();
+            
+            const symbolSelect = document.getElementById('symbol');
+            pairs.forEach(pair => {
+                const option = document.createElement('option');
+                option.value = pair;
+                option.textContent = pair;
+                symbolSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading pairs:', error);
+        }
+    }
+
+    // Handle form submission
+    document.getElementById('backtest-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const params = new URLSearchParams();
+        
+        // Add form data to params
+        for (let [key, value] of formData.entries()) {
+            params.append(key, value);
+        }
+        
+        // Show results section and loading state
+        document.getElementById('results-section').classList.remove('hidden');
+        document.getElementById('loading-results').classList.remove('hidden');
+        document.getElementById('results-content').classList.add('hidden');
+        
+        try {
+            // Run backtest
+            const response = await fetch(`/api/v1/backtest/?${params.toString()}`);
+            const result = await response.json();
+            
+            if (response.ok) {
+                displayResults(result);
+            } else {
+                alert('Error running backtest: ' + result.detail);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error running backtest. Please try again.');
+        } finally {
+            // Hide loading state
+            document.getElementById('loading-results').classList.add('hidden');
+        }
+    });
+
+    // Display backtest results
+    function displayResults(result) {
+        // Update summary cards
+        document.getElementById('total-trades').textContent = result.metrics.total_trades;
+        document.getElementById('win-rate').textContent = result.metrics.win_rate.toFixed(1) + '%';
+        document.getElementById('profit-factor').textContent = result.metrics.profit_factor.toFixed(2);
+        document.getElementById('avg-r').textContent = result.metrics.average_r.toFixed(2);
+        
+        // Update detailed metrics
+        document.getElementById('expectancy').textContent = result.metrics.expectancy.toFixed(2);
+        document.getElementById('max-drawdown').textContent = result.metrics.max_drawdown_r.toFixed(2);
+        document.getElementById('sharpe-like').textContent = result.metrics.sharpe_like.toFixed(2);
+        document.getElementById('time-in-market').textContent = result.metrics.time_in_market.toFixed(1) + '%';
+        
+        // Update strategy parameters
+        document.getElementById('result-symbol').textContent = result.symbol;
+        document.getElementById('result-timeframe').textContent = result.timeframe;
+        document.getElementById('result-period').textContent = result.period;
+        document.getElementById('result-sl').textContent = result.parameters.sl_percent + '%';
+        document.getElementById('result-tp').textContent = result.parameters.tp_percent + '%';
+        
+        // Update CSV download link
+        if (result.csv_url) {
+            document.getElementById('csv-download').href = result.csv_url;
+        }
+        
+        // Show results content
+        document.getElementById('results-content').classList.remove('hidden');
+    }
+</script>
+{% endblock %}

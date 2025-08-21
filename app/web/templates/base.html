@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title }}{% endblock %} - SMC Signal Service</title>
+    
+    <!-- HTMX for dynamic content -->
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold">SMC Signal Service</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/web/" class="hover:text-gray-200 transition-colors">Dashboard</a>
+                    <a href="/web/backtest" class="hover:text-gray-200 transition-colors">Backtest</a>
+                    <a href="/docs" class="hover:text-gray-200 transition-colors">API Docs</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p>&copy; 2024 SMC Signal Service. Smart Money Concepts trading signals.</p>
+        </div>
+    </footer>
+
+    <!-- HTMX loading indicator -->
+    <div id="htmx-indicator" class="htmx-indicator fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+        Loading...
+    </div>
+
+    <script>
+        // HTMX loading indicator
+        document.body.addEventListener('htmx:beforeRequest', function() {
+            document.getElementById('htmx-indicator').classList.remove('hidden');
+        });
+        
+        document.body.addEventListener('htmx:afterRequest', function() {
+            document.getElementById('htmx-indicator').classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
