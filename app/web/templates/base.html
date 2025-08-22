@@ -21,6 +21,21 @@
         .card-shadow {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+        .mode-indicator {
+            transition: all 0.3s ease;
+        }
+        .mode-trading {
+            background-color: #10b981;
+            color: white;
+        }
+        .mode-viewonly {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .mode-disabled {
+            background-color: #ef4444;
+            color: white;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -34,11 +49,29 @@
                 <div class="flex items-center space-x-4">
                     <a href="/web/" class="hover:text-gray-200 transition-colors">Dashboard</a>
                     <a href="/web/backtest" class="hover:text-gray-200 transition-colors">Backtest</a>
+                    <a href="/web/settings" class="hover:text-gray-200 transition-colors">Settings</a>
                     <a href="/docs" class="hover:text-gray-200 transition-colors">API Docs</a>
                 </div>
             </div>
         </div>
     </nav>
+
+    <!-- Trading Mode Indicator -->
+    <div class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-600">Mode:</span>
+                    <span id="trading-mode-indicator" class="px-3 py-1 rounded-full text-xs font-medium mode-indicator">
+                        Loading...
+                    </span>
+                </div>
+                <div id="trading-status-message" class="text-sm text-gray-600">
+                    Checking trading status...
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -66,6 +99,51 @@
         document.body.addEventListener('htmx:afterRequest', function() {
             document.getElementById('htmx-indicator').classList.add('hidden');
         });
+
+        // Load trading status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTradingStatus();
+        });
+
+        // Load trading status
+        async function loadTradingStatus() {
+            try {
+                const response = await fetch('/api/v1/trading/status');
+                const status = await response.json();
+                
+                updateTradingModeIndicator(status);
+            } catch (error) {
+                console.error('Failed to load trading status:', error);
+                updateTradingModeIndicator({
+                    mode: 'Unknown',
+                    trading_enabled: false,
+                    message: 'Unable to determine trading status'
+                });
+            }
+        }
+
+        // Update trading mode indicator
+        function updateTradingModeIndicator(status) {
+            const indicator = document.getElementById('trading-mode-indicator');
+            const message = document.getElementById('trading-status-message');
+            
+            // Update mode text
+            indicator.textContent = status.mode;
+            
+            // Update styling based on mode
+            indicator.className = 'px-3 py-1 rounded-full text-xs font-medium mode-indicator';
+            
+            if (status.trading_enabled) {
+                indicator.classList.add('mode-trading');
+            } else if (status.has_api_keys) {
+                indicator.classList.add('mode-disabled');
+            } else {
+                indicator.classList.add('mode-viewonly');
+            }
+            
+            // Update status message
+            message.textContent = status.message;
+        }
     </script>
 </body>
 </html>

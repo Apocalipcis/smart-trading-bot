@@ -6,6 +6,7 @@ import signal
 import sys
 from typing import List
 from app.config import settings
+from app.utils.trading_state import trading_state
 from app.services.binance_client import BinanceClient
 from app.storage.parquet_storage import ParquetStorage
 from app.storage.cache_manager import cache
@@ -38,6 +39,9 @@ class WebSocketWorker:
         # Register callbacks
         self.binance_client.add_candle_callback(self._on_new_candle)
         self.binance_client.add_error_callback(self._on_error)
+        
+        # Log trading mode on startup
+        logger.info(f"WebSocket worker initialized in {trading_state.mode}")
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
@@ -53,7 +57,7 @@ class WebSocketWorker:
             cache_key = f"latest_candle:{candle.symbol}:{candle.timeframe}"
             cache.set(cache_key, candle, ttl=300)
             
-            # Store in persistent storage
+            # Store in persistent storage (optional in view-only mode)
             await self._store_candle(candle)
             
         except Exception as e:
@@ -66,6 +70,11 @@ class WebSocketWorker:
     async def _store_candle(self, candle):
         """Store candle in persistent storage."""
         try:
+            # In view-only mode, we can skip persistent storage or use a simplified approach
+            if not trading_state.trading_enabled:
+                logger.debug(f"View-only mode: Caching candle {candle.symbol} {candle.timeframe} {candle.timestamp}")
+                return
+            
             # Load existing candles to append
             existing_candles = self.storage.load_candles(
                 symbol=candle.symbol,
@@ -96,11 +105,17 @@ class WebSocketWorker:
             logger.info("Starting WebSocket worker...")
             self.running = True
             
-            # Connect to WebSocket
+            # Connect to WebSocket for market data (always enabled)
             await self.binance_client.connect_websocket(
                 symbols=self.symbols,
                 intervals=self.timeframes
             )
+            
+            # Log trading capabilities
+            if trading_state.trading_enabled:
+                logger.info("WebSocket worker running in full trading mode")
+            else:
+                logger.info("WebSocket worker running in view-only mode (market data only)")
             
             # Keep running until shutdown signal
             while self.running:

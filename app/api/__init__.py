@@ -1,7 +1,7 @@
 """API endpoints for the SMC Signal Service."""
 
 from fastapi import APIRouter
-from .endpoints import candles, signals, backtest, volatility, pairs
+from .endpoints import candles, signals, backtest, volatility, pairs, trading
 
 # Create main API router
 router = APIRouter()
@@ -12,3 +12,4 @@ router.include_router(signals.router, prefix="/signals", tags=["signals"])
 router.include_router(backtest.router, prefix="/backtest", tags=["backtest"])
 router.include_router(volatility.router, prefix="/scan", tags=["volatility"])
 router.include_router(pairs.router, prefix="/pairs", tags=["pairs"])
+router.include_router(trading.router, prefix="/trading", tags=["trading"])

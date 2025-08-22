@@ -8,6 +8,25 @@
         <p class="text-xl text-gray-600">Real-time Smart Money Concepts trading signals</p>
     </div>
 
+    <!-- Trading Actions (Conditional) -->
+    <div id="trading-actions" class="bg-white rounded-lg shadow-md p-6 hidden">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Trading Actions</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button id="quick-buy-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Quick Buy Signal
+            </button>
+            <button id="quick-sell-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Quick Sell Signal
+            </button>
+            <button id="manage-positions-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Manage Positions
+            </button>
+        </div>
+        <div id="trading-actions-message" class="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">
+            Trading actions are disabled. Configure API keys in settings to enable trading.
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="bg-white rounded-lg shadow-md p-6">
@@ -143,5 +162,86 @@
         const now = new Date();
         document.getElementById('last-update').textContent = now.toLocaleTimeString();
     }, 30000);
+
+    // Load trading status and update UI accordingly
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTradingStatus();
+    });
+
+    // Load trading status
+    async function loadTradingStatus() {
+        try {
+            const response = await fetch('/api/v1/trading/status');
+            const status = await response.json();
+            
+            updateTradingActions(status);
+        } catch (error) {
+            console.error('Failed to load trading status:', error);
+            // Default to disabled state
+            updateTradingActions({
+                trading_enabled: false,
+                has_api_keys: false
+            });
+        }
+    }
+
+    // Update trading actions based on status
+    function updateTradingActions(status) {
+        const tradingActions = document.getElementById('trading-actions');
+        const message = document.getElementById('trading-actions-message');
+        
+        if (status.trading_enabled) {
+            // Enable trading actions
+            tradingActions.classList.remove('hidden');
+            document.getElementById('quick-buy-btn').disabled = false;
+            document.getElementById('quick-sell-btn').disabled = false;
+            document.getElementById('manage-positions-btn').disabled = false;
+            
+            message.innerHTML = `
+                <div class="text-green-800 bg-green-50 border-green-200">
+                    ✓ Trading is enabled and operational
+                </div>
+            `;
+        } else {
+            // Show disabled trading actions
+            tradingActions.classList.remove('hidden');
+            document.getElementById('quick-buy-btn').disabled = true;
+            document.getElementById('quick-sell-btn').disabled = true;
+            document.getElementById('manage-positions-btn').disabled = true;
+            
+            if (status.has_api_keys) {
+                message.innerHTML = `
+                    <div class="text-yellow-800 bg-yellow-50 border-yellow-200">
+                        ⚠ API keys configured but trading execution is disabled
+                    </div>
+                `;
+            } else {
+                message.innerHTML = `
+                    <div class="text-red-800 bg-red-50 border-red-200">
+                        ✗ Trading is unavailable. Add API keys in settings to enable trading mode.
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Add tooltips for disabled buttons
+    document.getElementById('quick-buy-btn').addEventListener('mouseenter', function() {
+        if (this.disabled) {
+            this.title = 'Trading is disabled. Configure API keys in settings to enable trading.';
+        }
+    });
+
+    document.getElementById('quick-sell-btn').addEventListener('mouseenter', function() {
+        if (this.disabled) {
+            this.title = 'Trading is disabled. Configure API keys in settings to enable trading.';
+        }
+    });
+
+    document.getElementById('manage-positions-btn').addEventListener('mouseenter', function() {
+        if (this.disabled) {
+            this.title = 'Trading is disabled. Configure API keys in settings to enable trading.';
+        }
+    });
 </script>
 {% endblock %}

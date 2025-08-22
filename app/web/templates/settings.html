@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">Settings</h1>
+        <p class="text-xl text-gray-600">Configure API keys and trading settings</p>
+    </div>
+
+    <!-- Trading Status Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Trading Status</h2>
+        
+        <div id="trading-status-card" class="space-y-4">
+            <div class="text-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading trading status...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Setup Requirements -->
+    <div id="setup-requirements" class="bg-white rounded-lg shadow-md p-6 hidden">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Setup Requirements</h2>
+        <div id="requirements-list" class="space-y-2">
+            <!-- Requirements will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- API Keys Configuration -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">API Keys Configuration</h2>
+        
+        <div class="space-y-6">
+            <!-- Current Status -->
+            <div id="api-keys-status" class="p-4 rounded-lg border">
+                <div class="text-center py-4">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p class="text-gray-500 mt-2">Checking API keys...</p>
+                </div>
+            </div>
+
+            <!-- Configuration Form -->
+            <form id="api-keys-form" class="space-y-4">
+                <div>
+                    <label for="binance-api-key" class="block text-sm font-medium text-gray-700 mb-2">
+                        Binance API Key
+                    </label>
+                    <input type="text" id="binance-api-key" name="binance_api_key" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter your Binance API key">
+                </div>
+
+                <div>
+                    <label for="binance-secret-key" class="block text-sm font-medium text-gray-700 mb-2">
+                        Binance Secret Key
+                    </label>
+                    <input type="password" id="binance-secret-key" name="binance_secret_key" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter your Binance secret key">
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="binance-testnet" name="binance_testnet" 
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="binance-testnet" class="ml-2 block text-sm text-gray-900">
+                        Use Binance Testnet (for testing only)
+                    </label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="execution-enabled" name="execution_enabled" 
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="execution-enabled" class="ml-2 block text-sm text-gray-900">
+                        Enable live trading execution
+                    </label>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+                        Save Configuration
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Security Configuration -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Security Configuration</h2>
+        
+        <div class="space-y-6">
+            <!-- Current Security Status -->
+            <div id="security-status" class="p-4 rounded-lg border">
+                <div class="text-center py-4">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p class="text-gray-500 mt-2">Checking security status...</p>
+                </div>
+            </div>
+
+            <!-- Security Form -->
+            <form id="security-form" class="space-y-4">
+                <div>
+                    <label for="shared-secret" class="block text-sm font-medium text-gray-700 mb-2">
+                        Shared Secret
+                    </label>
+                    <input type="password" id="shared-secret" name="shared_secret" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter a shared secret for enhanced security">
+                    <p class="text-sm text-gray-500 mt-1">Optional but recommended for production use</p>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+                        Save Security Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="bg-blue-50 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">How to Enable Trading</h3>
+        <div class="space-y-3 text-blue-800">
+            <p>1. <strong>Get Binance API Keys:</strong> Create API keys in your Binance account settings</p>
+            <p>2. <strong>Configure Keys:</strong> Enter your API key and secret key above</p>
+            <p>3. <strong>Enable Execution:</strong> Check "Enable live trading execution" to activate trading</p>
+            <p>4. <strong>Test First:</strong> Use testnet mode initially to test your setup</p>
+            <p>5. <strong>Security (Optional):</strong> Configure a shared secret for enhanced security</p>
+            <p class="text-sm text-blue-700 mt-4">
+                <strong>Note:</strong> Never share your API keys. The system stores them securely and only uses them for trading operations.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Load trading status and API keys status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTradingStatus();
+        loadApiKeysStatus();
+        loadSecurityStatus();
+    });
+
+    // Load trading status
+    async function loadTradingStatus() {
+        try {
+            const response = await fetch('/api/v1/trading/status');
+            const status = await response.json();
+            
+            updateTradingStatusCard(status);
+            updateSetupRequirements(status);
+        } catch (error) {
+            console.error('Failed to load trading status:', error);
+            updateTradingStatusCard({
+                mode: 'Unknown',
+                trading_enabled: false,
+                message: 'Unable to determine trading status'
+            });
+        }
+    }
+
+    // Update trading status card
+    function updateTradingStatusCard(status) {
+        const container = document.getElementById('trading-status-card');
+        
+        let statusClass = 'bg-green-50 border-green-200';
+        let iconClass = 'text-green-600';
+        let icon = '✓';
+        
+        if (!status.trading_enabled) {
+            if (status.has_api_keys) {
+                statusClass = 'bg-yellow-50 border-yellow-200';
+                iconClass = 'text-yellow-600';
+                icon = '⚠';
+            } else {
+                statusClass = 'bg-red-50 border-red-200';
+                iconClass = 'text-red-600';
+                icon = '✗';
+            }
+        }
+        
+        container.innerHTML = `
+            <div class="p-4 rounded-lg border ${statusClass}">
+                <div class="flex items-center space-x-3">
+                    <div class="text-2xl ${iconClass}">${icon}</div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">${status.mode}</h3>
+                        <p class="text-gray-600">${status.message}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Update setup requirements
+    function updateSetupRequirements(status) {
+        const container = document.getElementById('setup-requirements');
+        const requirementsList = document.getElementById('requirements-list');
+        
+        if (status.setup_required && status.setup_required.length > 0) {
+            container.classList.remove('hidden');
+            
+            requirementsList.innerHTML = status.setup_required.map(req => `
+                <div class="flex items-center space-x-2 text-gray-700">
+                    <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <span>${req}</span>
+                </div>
+            `).join('');
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
+    // Load API keys status
+    async function loadApiKeysStatus() {
+        try {
+            const response = await fetch('/api/v1/trading/status');
+            const status = await response.json();
+            
+            updateApiKeysStatus(status);
+        } catch (error) {
+            console.error('Failed to load API keys status:', error);
+            updateApiKeysStatus({
+                has_api_keys: false,
+                api_keys_configured: false
+            });
+        }
+    }
+
+    // Update API keys status
+    function updateApiKeysStatus(status) {
+        const container = document.getElementById('api-keys-status');
+        
+        if (status.has_api_keys) {
+            container.innerHTML = `
+                <div class="p-4 rounded-lg border border-green-200 bg-green-50">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl text-green-600">✓</div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-900">API Keys Configured</h3>
+                            <p class="text-green-700">Your Binance API keys are properly configured.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="p-4 rounded-lg border border-red-200 bg-red-50">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl text-red-600">✗</div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-red-900">No API Keys Configured</h3>
+                            <p class="text-red-700">Trading is disabled. Add your Binance API keys to enable trading mode.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Load security status
+    async function loadSecurityStatus() {
+        try {
+            const response = await fetch('/api/v1/trading/status');
+            const status = await response.json();
+            
+            updateSecurityStatus(status);
+        } catch (error) {
+            console.error('Failed to load security status:', error);
+            updateSecurityStatus({
+                security_configured: false
+            });
+        }
+    }
+
+    // Update security status
+    function updateSecurityStatus(status) {
+        const container = document.getElementById('security-status');
+        
+        if (status.security_configured) {
+            container.innerHTML = `
+                <div class="p-4 rounded-lg border border-green-200 bg-green-50">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl text-green-600">✓</div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-900">Security Configured</h3>
+                            <p class="text-green-700">Enhanced security is enabled with shared secret.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="p-4 rounded-lg border border-yellow-200 bg-yellow-50">
+                    <div class="flex items-center space-x-3">
+                        <div class="text-2xl text-yellow-600">⚠</div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-yellow-900">Basic Security Mode</h3>
+                            <p class="text-yellow-700">No shared secret configured. Configure one for enhanced security.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Handle API keys form submission
+    document.getElementById('api-keys-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Show success message (in a real implementation, this would save to backend)
+        alert('Configuration saved! Note: This is a demo - API keys are not actually saved.');
+        
+        // Reload status
+        loadTradingStatus();
+        loadApiKeysStatus();
+    });
+
+    // Handle security form submission
+    document.getElementById('security-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Show success message (in a real implementation, this would save to backend)
+        alert('Security settings saved! Note: This is a demo - settings are not actually saved.');
+        
+        // Reload status
+        loadSecurityStatus();
+        loadTradingStatus();
+    });
+</script>
+{% endblock %}

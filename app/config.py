@@ -1,6 +1,6 @@
 """Configuration management for the SMC Signal Service."""
 
-from typing import List
+from typing import List, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Binance API Configuration
-    binance_api_key: str = Field(..., env='BINANCE_API_KEY')
-    binance_secret_key: str = Field(..., env='BINANCE_SECRET_KEY')
+    binance_api_key: Optional[str] = Field(None, env='BINANCE_API_KEY')
+    binance_secret_key: Optional[str] = Field(None, env='BINANCE_SECRET_KEY')
     binance_testnet: bool = Field(False, env='BINANCE_TESTNET')
     
     # Service Configuration
@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(100, env='RATE_LIMIT_REQUESTS')
     rate_limit_window: int = Field(60, env='RATE_LIMIT_WINDOW')
     
-    # Security
-    shared_secret: str = Field(..., env='SHARED_SECRET')
+    # Security (optional for view-only mode)
+    shared_secret: Optional[str] = Field(None, env='SHARED_SECRET')
     
     # Indicators Configuration
     indicators: List[str] = Field(['BOS', 'CHOCH', 'FVG', 'SWEEP'], env='INDICATORS')
@@ -54,6 +54,28 @@ class Settings(BaseSettings):
     backtest_max_lookback_days: int = Field(365, env='BACKTEST_MAX_LOOKBACK_DAYS')
     backtest_default_sl_percent: float = Field(2.0, env='BACKTEST_DEFAULT_SL_PERCENT')
     backtest_default_tp_percent: float = Field(4.0, env='BACKTEST_DEFAULT_TP_PERCENT')
+    
+    @property
+    def trading_enabled(self) -> bool:
+        """Check if trading is enabled based on API keys and execution setting."""
+        return (
+            self.binance_api_key is not None 
+            and self.binance_secret_key is not None 
+            and self.execution_enabled
+        )
+    
+    @property
+    def has_api_keys(self) -> bool:
+        """Check if API keys are configured."""
+        return (
+            self.binance_api_key is not None 
+            and self.binance_secret_key is not None
+        )
+    
+    @property
+    def security_configured(self) -> bool:
+        """Check if security is properly configured."""
+        return self.shared_secret is not None
     
     class Config:
         env_file = '.env'

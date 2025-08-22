@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 
 from app.config import settings
+from app.utils.trading_state import trading_state
 from app.api import router as api_router
 from app.web import router as web_router
 
@@ -26,6 +27,21 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     logger.info("Starting SMC Signal Service...")
+    
+    # Initialize trading state
+    logger.info(f"Trading mode: {trading_state.mode}")
+    if trading_state.trading_enabled:
+        logger.info("✓ Trading is fully enabled and operational")
+    elif trading_state.has_api_keys:
+        logger.warning("⚠ API keys configured but trading execution disabled")
+    else:
+        logger.warning("✗ Running in view-only mode - no API keys configured")
+    
+    # Check security configuration
+    if trading_state.security_configured:
+        logger.info("✓ Security properly configured with shared secret")
+    else:
+        logger.warning("⚠ No shared secret configured - running in basic security mode")
     
     # Startup tasks
     logger.info("Service started successfully")
@@ -68,7 +84,13 @@ async def health_check():
         "status": "healthy",
         "service": "SMC Signal Service",
         "version": "0.1.0",
-        "environment": settings.environment
+        "environment": settings.environment,
+        "trading": {
+            "enabled": trading_state.trading_enabled,
+            "mode": trading_state.mode,
+            "has_api_keys": trading_state.has_api_keys,
+            "security_configured": trading_state.security_configured
+        }
     }
 
 
@@ -79,7 +101,9 @@ async def root():
         "service": "SMC Signal Service",
         "version": "0.1.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "trading_mode": trading_state.mode,
+        "security": "configured" if trading_state.security_configured else "basic"
     }
 
 
