@@ -11,19 +11,26 @@ from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 import backtrader as bt
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Signal(BaseModel):
     """Trading signal with all required parameters."""
     
     side: str = Field(..., description="Trade side: 'long' or 'short'")
-    entry: float = Field(..., description="Entry price")
-    stop_loss: float = Field(..., description="Stop loss price")
-    take_profit: float = Field(..., description="Take profit price")
+    entry: float = Field(..., gt=0, description="Entry price")
+    stop_loss: float = Field(..., gt=0, description="Stop loss price")
+    take_profit: float = Field(..., gt=0, description="Take profit price")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Signal confidence 0-1")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Signal timestamp")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional signal metadata")
+    
+    @field_validator('side')
+    @classmethod
+    def validate_side(cls, v):
+        if v not in ['long', 'short']:
+            raise ValueError("side must be 'long' or 'short'")
+        return v
     
     class Config:
         json_encoders = {
