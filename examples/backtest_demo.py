@@ -16,10 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import backtests components
-from backtests.storage import BacktestStorage
-from backtests.metrics import BacktestMetrics
-from backtests.integrity import DataIntegrityChecker
-from backtests.models import BacktestConfig, BacktestResult
+from src.backtests.storage import BacktestStorage
+from src.backtests.metrics import BacktestMetrics
+from src.backtests.integrity import DataIntegrityChecker
+from src.backtests.models import BacktestConfig, BacktestResult
 
 
 async def demo_storage():
