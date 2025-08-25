@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   trading-bot:
     build:
@@ -9,7 +7,8 @@ services:
     container_name: smart-trading-bot
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "80:80"  # Web interface
+      - "8000:8000"  # API (for direct access)
     volumes:
       - ./data:/data
       - ./logs:/app/logs
@@ -42,21 +41,6 @@ services:
       start_period: 40s
     networks:
       - trading-network
-
-  # Optional: Redis for caching (if needed in future)
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: trading-bot-redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
-  #   networks:
-  #     - trading-network
-
-volumes:
-  # redis-data:
 
 networks:
   trading-network:
