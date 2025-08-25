@@ -134,6 +134,13 @@ async def api_root():
     }
 
 
+@app.get("/status/health")
+async def health_check_redirect():
+    """Redirect for Docker healthcheck compatibility."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/v1/status/health")
+
+
 if __name__ == "__main__":
     import uvicorn
     
