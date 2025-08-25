@@ -1,34 +1,108 @@
 """Status router for health checks and system status."""
 
 import time
+import asyncio
 from datetime import datetime, timezone
+from typing import Dict, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from ..schemas import HealthStatus
+from ...storage.db import get_db_manager
+from ...data.binance_client import BinanceClient
+from ...logging_config import get_logger
 
 router = APIRouter(prefix="/status", tags=["status"])
 
 # Application start time for uptime calculation
 _start_time = time.time()
 
+# Global logger
+logger = get_logger(__name__)
+
+# Health check cache
+_health_cache: Dict[str, Any] = {}
+_cache_timestamp = 0
+_cache_ttl = 30  # Cache for 30 seconds
+
 
 @router.get("/health", response_model=HealthStatus)
 async def health_check() -> HealthStatus:
     """Health check endpoint."""
-    uptime = time.time() - _start_time
+    global _health_cache, _cache_timestamp
     
-    # TODO: Add actual health checks for database and exchange connections
-    # For now, return placeholder values
+    current_time = time.time()
     
-    return HealthStatus(
-        status="healthy",
-        timestamp=datetime.now(timezone.utc),
-        version="1.0.0",
-        uptime=uptime,
-        database_connected=True,  # Placeholder
-        exchange_connected=True   # Placeholder
-    )
+    # Return cached result if still valid
+    if current_time - _cache_timestamp < _cache_timestamp:
+        return HealthStatus(**{**_health_cache, "timestamp": datetime.now(timezone.utc)})
+    
+    uptime = current_time - _start_time
+    
+    try:
+        # Check database connection
+        db_manager = await get_db_manager()
+        db_health = await db_manager.health_check()
+        database_connected = db_health["status"] == "healthy"
+        
+        # Check exchange connection (basic ping)
+        exchange_connected = await _check_exchange_connection()
+        
+        # Determine overall status
+        overall_status = "healthy" if database_connected and exchange_connected else "degraded"
+        
+        # Cache the results
+        _health_cache = {
+            "status": overall_status,
+            "version": "1.0.0",
+            "uptime": uptime,
+            "database_connected": database_connected,
+            "exchange_connected": exchange_connected
+        }
+        _cache_timestamp = current_time
+        
+        logger.info(
+            "Health check completed",
+            status=overall_status,
+            database_connected=database_connected,
+            exchange_connected=exchange_connected,
+            uptime=uptime
+        )
+        
+        return HealthStatus(
+            status=overall_status,
+            timestamp=datetime.now(timezone.utc),
+            version="1.0.0",
+            uptime=uptime,
+            database_connected=database_connected,
+            exchange_connected=exchange_connected
+        )
+        
+    except Exception as e:
+        logger.error("Health check failed", error=str(e))
+        return HealthStatus(
+            status="unhealthy",
+            timestamp=datetime.now(timezone.utc),
+            version="1.0.0",
+            uptime=uptime,
+            database_connected=False,
+            exchange_connected=False
+        )
+
+
+async def _check_exchange_connection() -> bool:
+    """Check exchange connection status."""
+    try:
+        # Create a temporary client to test connection
+        from ...data.binance_client import BinanceConfig
+        config = BinanceConfig()  # Use default config
+        client = BinanceClient(config)
+        # Try to get server time (lightweight operation)
+        await client.get_server_time()
+        return True
+    except Exception as e:
+        logger.warning("Exchange connection check failed", error=str(e))
+        return False
 
 
 @router.get("/health/detailed")

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  trading-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: smart-trading-bot
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - DATA_DIR=/data
+      - DB_PATH=/data/app.db
+      - LOG_LEVEL=INFO
+      - DEBUG_MODE=false
+      - TRADING_ENABLED=false
+      - ORDER_CONFIRMATION_REQUIRED=true
+      - MAX_OPEN_POSITIONS=5
+      - MAX_RISK_PER_TRADE=2.0
+      - MIN_RISK_REWARD_RATIO=3.0
+      - EXCHANGE=binance_futures
+      - WS_URL=wss://fstream.binance.com/ws
+      - REST_URL=https://fapi.binance.com
+      - DEFAULT_COMMISSION=0.001
+      - DEFAULT_SLIPPAGE=0.0001
+      - DEFAULT_INITIAL_CAPITAL=10000.0
+      - DATA_STORAGE_FORMAT=parquet
+      - DATA_RETENTION_DAYS=365
+      - DATA_COMPRESSION=true
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - trading-network
+
+  # Optional: Redis for caching (if needed in future)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: trading-bot-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - trading-network
+
+volumes:
+  # redis-data:
+
+networks:
+  trading-network:
+    driver: bridge

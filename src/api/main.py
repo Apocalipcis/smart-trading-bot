@@ -9,8 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .middleware import (
     CorrelationIdMiddleware,
-    StructuredLoggingMiddleware,
-    setup_logging
+    StructuredLoggingMiddleware
 )
 from .routers import (
     backtests,
@@ -21,9 +20,7 @@ from .routers import (
     signals,
     status
 )
-
-# Setup structured logging
-setup_logging()
+from ..startup import create_startup_event_handler, create_shutdown_event_handler
 
 
 @asynccontextmanager
@@ -32,12 +29,18 @@ async def lifespan(app: FastAPI):
     # Startup
     print("🚀 Starting Trading Bot API...")
     
-    # TODO: Initialize database connections, data feeds, etc.
+    # Initialize application components
+    startup_handler = create_startup_event_handler()
+    await startup_handler()
     
     yield
     
     # Shutdown
     print("🛑 Shutting down Trading Bot API...")
+    
+    # Shutdown application components
+    shutdown_handler = create_shutdown_event_handler()
+    await shutdown_handler()
 
 
 # Create FastAPI application
