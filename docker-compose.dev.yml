@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  trading-bot-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: smart-trading-bot-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+      - ./src:/app/src  # Mount source code for live reload
+      - ./tests:/app/tests
+      - ./examples:/app/examples
+    environment:
+      - DATA_DIR=/data
+      - DB_PATH=/data/app.db
+      - LOG_LEVEL=DEBUG
+      - DEBUG_MODE=true
+      - TRADING_ENABLED=false
+      - ORDER_CONFIRMATION_REQUIRED=true
+      - MAX_OPEN_POSITIONS=5
+      - MAX_RISK_PER_TRADE=2.0
+      - MIN_RISK_REWARD_RATIO=3.0
+      - EXCHANGE=binance_futures
+      - WS_URL=wss://fstream.binance.com/ws
+      - REST_URL=https://fapi.binance.com
+      - DEFAULT_COMMISSION=0.001
+      - DEFAULT_SLIPPAGE=0.0001
+      - DEFAULT_INITIAL_CAPITAL=10000.0
+      - DATA_STORAGE_FORMAT=parquet
+      - DATA_RETENTION_DAYS=365
+      - DATA_COMPRESSION=true
+      - RELOAD=true
+    env_file:
+      - .env
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - trading-network-dev
+
+  # Development database (optional)
+  # sqlite-dev:
+  #   image: alpine:latest
+  #   container_name: sqlite-dev
+  #   volumes:
+  #     - ./data:/data
+  #   command: ["sh", "-c", "apk add --no-cache sqlite && sqlite3 /data/app.db '.tables'"]
+  #   networks:
+  #     - trading-network-dev
+
+networks:
+  trading-network-dev:
+    driver: bridge

@@ -1,0 +1,47 @@
+services:
+  trading-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: smart-trading-bot
+    restart: unless-stopped
+    ports:
+      - "80:80"  # Web interface
+      - "8000:8000"  # API (for direct access)
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logsit
+    environment:
+      - DATA_DIR=/data
+      - DB_PATH=/data/app.db
+      - LOG_LEVEL=INFO
+      - DEBUG_MODE=false
+      - TRADING_ENABLED=false
+      - ORDER_CONFIRMATION_REQUIRED=true
+      - MAX_OPEN_POSITIONS=5
+      - MAX_RISK_PER_TRADE=2.0
+      - MIN_RISK_REWARD_RATIO=3.0
+      - EXCHANGE=binance_futures
+      - WS_URL=wss://fstream.binance.com/ws
+      - REST_URL=https://fapi.binance.com
+      - DEFAULT_COMMISSION=0.001
+      - DEFAULT_SLIPPAGE=0.0001
+      - DEFAULT_INITIAL_CAPITAL=10000.0
+      - DATA_STORAGE_FORMAT=parquet
+      - DATA_RETENTION_DAYS=365
+      - DATA_COMPRESSION=true
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - trading-network
+
+networks:
+  trading-network:
+    driver: bridge
