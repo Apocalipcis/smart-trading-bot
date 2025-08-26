@@ -99,7 +99,7 @@ async def run_backtest(args):
         if result.status == "completed":
             logger.info("Backtest completed successfully!")
             logger.info(f"Final value: ${result.final_value:,.2f}")
-            logger.info(f"Total return: {result.total_return_pct:.2f}%")
+            logger.info(f"Total return: {result.total_return:.2f}%")
             logger.info(f"Win rate: {result.win_rate:.2f}%")
             logger.info(f"Total trades: {result.total_trades}")
             logger.info(f"Max drawdown: {result.max_drawdown:.2f}%")
@@ -275,7 +275,7 @@ Examples:
         """
     )
     
-    parser.add_argument('--data-dir', default='/data', help='Data directory path')
+    parser.add_argument('--data-dir', default='data', help='Data directory path')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')

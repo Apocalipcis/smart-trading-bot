@@ -137,9 +137,14 @@ class Settings(BaseModel):
     trading_enabled: bool = Field(default=False, description="Whether trading is enabled")
     order_confirmation_required: bool = Field(default=True, description="Whether order confirmation is required")
     max_open_positions: int = Field(default=5, description="Maximum number of open positions")
+    risk_per_trade: float = Field(default=2.0, ge=0.0, le=100.0, description="Risk per trade (%)")
+    default_leverage: int = Field(default=1, ge=1, le=125, description="Default leverage for futures trading")
+    telegram_enabled: bool = Field(default=False, description="Whether Telegram notifications are enabled")
+    telegram_bot_token: Optional[str] = Field(None, description="Telegram bot token")
+    telegram_chat_id: Optional[str] = Field(None, description="Telegram chat ID")
+    # Backend-specific fields
     max_risk_per_trade: float = Field(default=2.0, ge=0.0, le=100.0, description="Maximum risk per trade (%)")
     min_risk_reward_ratio: float = Field(default=3.0, ge=1.0, description="Minimum risk-reward ratio")
-    telegram_enabled: bool = Field(default=False, description="Whether Telegram notifications are enabled")
     debug_mode: bool = Field(default=False, description="Whether debug mode is enabled")
 
 

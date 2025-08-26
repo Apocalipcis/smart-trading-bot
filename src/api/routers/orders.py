@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from ..dependencies import require_trading_enabled
+from ..dependencies import require_trading_enabled, require_read_access
 from ..schemas import APIResponse, Order, OrderRequest, PaginatedResponse
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -149,6 +149,21 @@ async def delete_order(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Order {order_id} not found"
     )
+
+
+@router.get("/pending")
+async def get_pending_orders(
+    read_access: bool = Depends(require_read_access)
+):
+    """Get pending orders (alias for pending/confirmation)."""
+    # Return orders with "pending" status
+    pending_orders = [o for o in _orders if o.status == "pending"]
+    
+    return {
+        "pending_orders": pending_orders,
+        "count": len(pending_orders)
+    }
+
 
 
 @router.get("/pending/confirmation")

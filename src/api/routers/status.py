@@ -96,10 +96,11 @@ async def _check_exchange_connection() -> bool:
         # Create a temporary client to test connection
         from ...data.binance_client import BinanceConfig
         config = BinanceConfig()  # Use default config
-        client = BinanceClient(config)
-        # Try to get server time (lightweight operation)
-        await client.get_server_time()
-        return True
+        
+        async with BinanceClient(config) as client:
+            # Try to get server time (lightweight operation)
+            await client.get_server_time()
+            return True
     except Exception as e:
         logger.warning("Exchange connection check failed", error=str(e))
         return False

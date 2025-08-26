@@ -170,3 +170,16 @@ cython_debug/
 *.sqlite
 config.env
 secrets.env
+
+# Generated data
+data/candles/
+data/backtests/
+data/artifacts/
+data/reports/
+data/logs/
+*.parquet
+*.csv
+
+# Keep data directory structure but ignore content
+!data/
+!data/.gitkeep

@@ -215,19 +215,20 @@ class BaseStrategy(bt.Strategy):
         self.current_positions = len([pos for pos in self.broker.positions.values() if pos.size != 0])
         
         # Update trade history
-        for trade in self.broker.trades:
-            if trade.status == trade.Status.Closed and trade not in self.trade_history:
-                trade_info = {
-                    'entry_date': trade.dtopen,
-                    'exit_date': trade.dtclose,
-                    'entry_price': trade.price,
-                    'exit_price': trade.pclose,
-                    'size': trade.size,
-                    'pnl': trade.pnl,
-                    'pnlcomm': trade.pnlcomm,
-                    'status': 'closed'
-                }
-                self.trade_history.append(trade_info)
+        if hasattr(self.broker, 'trades') and self.broker.trades:
+            for trade in self.broker.trades:
+                if trade.status == trade.Status.Closed and trade not in self.trade_history:
+                    trade_info = {
+                        'entry_date': trade.dtopen,
+                        'exit_date': trade.dtclose,
+                        'entry_price': trade.price,
+                        'exit_price': trade.pclose,
+                        'size': trade.size,
+                        'pnl': trade.pnl,
+                        'pnlcomm': trade.pnlcomm,
+                        'status': 'closed'
+                    }
+                    self.trade_history.append(trade_info)
     
     def get_strategy_stats(self) -> Dict[str, Any]:
         """

@@ -106,6 +106,38 @@ async def stream_signals_sse(request: Request):
     return EventSourceResponse(event_generator())
 
 
+@router.get("/stream")
+async def stream_signals(request: Request):
+    """Alias endpoint for signals stream - redirects to SSE endpoint."""
+    # This is an alias for the SSE endpoint to match frontend expectations
+    async def event_generator():
+        # Add connection to active list
+        _active_connections.append(request)
+        
+        try:
+            while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    break
+                
+                # Send heartbeat every 30 seconds
+                yield {
+                    "event": "heartbeat",
+                    "data": json.dumps({"timestamp": datetime.now(timezone.utc).isoformat()})
+                }
+                
+                await asyncio.sleep(30)
+                
+        except asyncio.CancelledError:
+            pass
+        finally:
+            # Remove connection from active list
+            if request in _active_connections:
+                _active_connections.remove(request)
+    
+    return EventSourceResponse(event_generator())
+
+
 @router.get("/stream/websocket")
 async def stream_signals_websocket():
     """Stream signals using WebSocket (placeholder for future implementation)."""

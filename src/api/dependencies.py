@@ -42,6 +42,14 @@ def require_trading_enabled(
     return trading_enabled
 
 
+def require_read_access(
+    settings: Settings = Depends(get_settings)
+) -> bool:
+    """Allow read access without requiring trading to be enabled."""
+    # Always return True, regardless of trading_enabled setting
+    return True
+
+
 def get_api_keys() -> tuple[Optional[str], Optional[str]]:
     """Get API keys from environment variables."""
     api_key = os.getenv("BINANCE_API_KEY")

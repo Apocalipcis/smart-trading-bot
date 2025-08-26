@@ -88,7 +88,7 @@ class TradingBotApp:
     
     async def _setup_settings(self) -> None:
         """Initialize settings manager."""
-        data_dir = os.getenv("DATA_DIR", "/data")
+        data_dir = os.getenv("DATA_DIR", "data")
         db_path = os.getenv("DB_PATH", "/data/app.db")
         
         self.settings_manager = SettingsManager()
@@ -112,7 +112,7 @@ class TradingBotApp:
     
     async def _create_data_directories(self) -> None:
         """Create necessary data directories."""
-        data_dir = Path(os.getenv("DATA_DIR", "/data"))
+        data_dir = Path(os.getenv("DATA_DIR", "data"))
         
         directories = [
             data_dir / "candles",
