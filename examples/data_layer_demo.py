@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.data.binance_client import BinanceClient, BinanceConfig
 from src.data.validators import BinanceValidator
-from src.data.rate_limit import RateLimiter, RateLimitConfig
+from src.data.rate_limit import RateLimiter, RateLimitConfig, RequestType
 from src.data.stream import WebSocketStreamManager, StreamConfig
 from src.data.feed import BinanceDataFeed
 
@@ -131,7 +131,7 @@ async def demo_rate_limiter():
         results = []
         for i in range(5):
             result = await rate_limiter.execute_with_retry(
-                test_function, 
+                lambda: test_function(f"task_{i}"), 
                 RequestType.REST, 
                 f"task_{i}"
             )

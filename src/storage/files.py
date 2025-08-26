@@ -16,7 +16,11 @@ logger = structlog.get_logger(__name__)
 class FileManager:
     """Manages file operations for the trading bot data hierarchy."""
     
-    def __init__(self, data_dir: str = "/data"):
+    def __init__(self, data_dir: str = None):
+        # Use environment variable or default based on context
+        if data_dir is None:
+            import os
+            data_dir = os.getenv("DATA_DIR", "data")
         self.data_dir = Path(data_dir)
         self.candles_dir = self.data_dir / "candles"
         self.backtests_dir = self.data_dir / "backtests"
@@ -50,7 +54,7 @@ class FileManager:
         # Normalize symbol (remove special characters, uppercase)
         normalized_symbol = symbol.upper().replace("/", "").replace("-", "")
         
-        # Create directory structure: /data/candles/{exchange}/{symbol}/
+        # Create directory structure: data/candles/{exchange}/{symbol}/
         candle_dir = self.candles_dir / exchange.lower() / normalized_symbol
         candle_dir.mkdir(parents=True, exist_ok=True)
         
@@ -160,7 +164,7 @@ class FileManager:
         if date is None:
             date = datetime.now()
         
-        # Create date-based directory: /data/backtests/{YYYY-MM-DD}/
+        # Create date-based directory: data/backtests/{YYYY-MM-DD}/
         date_dir = self.backtests_dir / date.strftime("%Y-%m-%d")
         date_dir.mkdir(parents=True, exist_ok=True)
         
@@ -464,7 +468,11 @@ class FileManager:
 _file_manager: Optional[FileManager] = None
 
 
-def get_file_manager(data_dir: str = "/data") -> FileManager:
+def get_file_manager(data_dir: str = None) -> FileManager:
+    # Use environment variable or default based on context
+    if data_dir is None:
+        import os
+        data_dir = os.getenv("DATA_DIR", "data")
     """Get the global file manager instance."""
     global _file_manager
     if _file_manager is None:

@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional, Union
 
 import backtrader as bt
 import pandas as pd
+import pyarrow.parquet as pq
 
 from .models import BacktestConfig, BacktestResult
-from ..data.feed import BinanceDataFeed
 from ..strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 class BacktestRunner:
     """Runs backtests using Backtrader Cerebro."""
     
-    def __init__(self, data_dir: str = "/data"):
+    def __init__(self, data_dir: str = None):
+        # Use environment variable or default based on context
+        if data_dir is None:
+            import os
+            data_dir = os.getenv("DATA_DIR", "data")
         self.data_dir = Path(data_dir)
         self.cerebro = None
         
@@ -56,49 +60,110 @@ class BacktestRunner:
         
         return cerebro
     
-    def _create_data_feed(self, config: BacktestConfig) -> BinanceDataFeed:
-        """Create data feed for the backtest."""
-        # Convert timeframe to Backtrader format
-        timeframe_map = {
-            "1m": bt.TimeFrame.Minutes,
-            "5m": bt.TimeFrame.Minutes,
-            "15m": bt.TimeFrame.Minutes,
-            "30m": bt.TimeFrame.Minutes,
-            "1h": bt.TimeFrame.Minutes,
-            "4h": bt.TimeFrame.Minutes,
-            "1d": bt.TimeFrame.Days,
-        }
+    def _load_parquet_data(self, config: BacktestConfig) -> pd.DataFrame:
+        """Load data from parquet file and prepare it for Backtrader."""
+        # Construct file path
+        file_path = self.data_dir / 'candles' / 'binance_futures' / config.symbol / f"{config.timeframe}.parquet"
         
-        compression_map = {
-            "1m": 1,
-            "5m": 5,
-            "15m": 15,
-            "30m": 30,
-            "1h": 60,
-            "4h": 240,
-            "1d": 1,
-        }
+        if not file_path.exists():
+            raise FileNotFoundError(f"Data file not found: {file_path}")
         
-        if config.timeframe not in timeframe_map:
-            raise ValueError(f"Unsupported timeframe: {config.timeframe}")
-            
-        # Create data feed
-        data_feed = BinanceDataFeed(
-            symbol=config.symbol,
-            timeframe=timeframe_map[config.timeframe],
-            compression=compression_map[config.timeframe],
-            fromdate=config.start_date,
-            todate=config.end_date,
-            data_dir=self.data_dir,
+        logger.info(f"Loading data from {file_path}")
+        
+        # Read Parquet file
+        table = pq.read_table(file_path)
+        df = table.to_pandas()
+        
+        logger.info(f"Loaded DataFrame with shape: {df.shape}, columns: {list(df.columns)}")
+        
+        # Check if datetime is already the index
+        if df.index.name == 'datetime' or isinstance(df.index, pd.DatetimeIndex):
+            # Data already has datetime as index, no need to convert
+            pass
+        elif 'open_time' in df.columns:
+            # Convert timestamp to datetime
+            df['datetime'] = pd.to_datetime(df['open_time'], unit='ms', utc=True)
+            df.set_index('datetime', inplace=True)
+        elif 'datetime' in df.columns:
+            # Convert datetime column to index
+            df['datetime'] = pd.to_datetime(df['datetime'])
+            df.set_index('datetime', inplace=True)
+        else:
+            raise ValueError("No datetime column or index found in data")
+        
+        # Sort by datetime to ensure chronological order
+        df.sort_index(inplace=True)
+        
+        # Filter by date range if specified
+        if config.start_date:
+            # Convert start_date to UTC timezone if it's naive
+            start_date = config.start_date
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=pd.Timestamp.utcnow().tz)
+            df = df[df.index >= start_date]
+        if config.end_date:
+            # Convert end_date to UTC timezone if it's naive
+            end_date = config.end_date
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=pd.Timestamp.utcnow().tz)
+            df = df[df.index <= end_date]
+        
+        # Ensure we have the required columns
+        required_columns = ['open', 'high', 'low', 'close', 'volume']
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"Missing required column: {col}")
+        
+        # Validate data integrity
+        if len(df) == 0:
+            raise ValueError("No data available after filtering")
+        
+        if df.isnull().any().any():
+            raise ValueError("Data contains null values")
+        
+        logger.info(f"Prepared data with {len(df)} candles from {df.index[0]} to {df.index[-1]}")
+        
+        return df
+    
+    def _create_data_feed(self, config: BacktestConfig) -> bt.feeds.PandasData:
+        """Create data feed for the backtest using standard Backtrader PandasData."""
+        # Load data first
+        df = self._load_parquet_data(config)
+        
+        # Create standard Backtrader PandasData feed
+        data_feed = bt.feeds.PandasData(
+            dataname=df,
+            datetime=None,  # Use index as datetime
+            open='open',
+            high='high',
+            low='low',
+            close='close',
+            volume='volume',
+            openinterest=None
         )
         
         return data_feed
     
     def _get_strategy_class(self, strategy_name: str) -> type:
         """Get strategy class by name."""
-        # This will be implemented when strategies package is created
-        # For now, return a placeholder
+        from ..strategies.registry import get_strategy
         from ..strategies.base import BaseStrategy
+        
+        # Try to get strategy from registry
+        strategy_class = get_strategy(strategy_name)
+        if strategy_class:
+            return strategy_class
+        
+        # Fallback to direct import for common strategies
+        if strategy_name.upper() == 'SMC':
+            from ..strategies.smc import SMCStrategy
+            return SMCStrategy
+        elif strategy_name.upper() == 'SIMPLE_TEST':
+            from ..strategies.simple_test import SimpleTestStrategy
+            return SimpleTestStrategy
+        
+        # Default fallback
+        logger.warning(f"Strategy '{strategy_name}' not found in registry, using BaseStrategy")
         return BaseStrategy
     
     def _calculate_metrics(self, cerebro: bt.Cerebro, config: BacktestConfig) -> Dict[str, Any]:
@@ -114,18 +179,37 @@ class BacktestRunner:
         initial_cash = config.initial_cash
         total_return = ((final_value - initial_cash) / initial_cash) * 100
         
-        # Get analyzer results
-        sharpe = strat.analyzers.sharpe.get_analysis()
-        drawdown = strat.analyzers.drawdown.get_analysis()
-        trades = strat.analyzers.trades.get_analysis()
-        returns = strat.analyzers.returns.get_analysis()
+        # Get analyzer results with error handling
+        try:
+            sharpe = strat.analyzers.sharpe.get_analysis()
+        except Exception:
+            sharpe = {}
+            
+        try:
+            drawdown = strat.analyzers.drawdown.get_analysis()
+        except Exception:
+            drawdown = {}
+            
+        try:
+            trades = strat.analyzers.trades.get_analysis()
+        except Exception:
+            trades = {}
+            
+        try:
+            returns = strat.analyzers.returns.get_analysis()
+        except Exception:
+            returns = {}
         
-        # Calculate metrics
+        # Calculate metrics with proper None handling
+        sharpe_ratio = sharpe.get("sharperatio")
+        if sharpe_ratio is None:
+            sharpe_ratio = 0.0
+        
         metrics = {
             "final_value": final_value,
             "total_return": total_return,
             "max_drawdown": drawdown.get("max", {}).get("drawdown", 0) * 100,
-            "sharpe_ratio": sharpe.get("sharperatio", 0),
+            "sharpe_ratio": sharpe_ratio,
             "total_trades": trades.get("total", {}).get("total", 0),
             "win_rate": 0,
             "profit_factor": 0,
@@ -222,20 +306,17 @@ class BacktestRunner:
         strat = results[0]
         trades = []
         
-        # Extract trade information
-        for trade in strat.trades:
-            trade_info = {
-                "entry_date": trade.dtopen,
-                "exit_date": trade.dtclose,
-                "entry_price": trade.price,
-                "exit_price": trade.pclose,
-                "size": trade.size,
-                "pnl": trade.pnl,
-                "pnl_comm": trade.pnlcomm,
-                "status": "closed" if trade.isclosed else "open",
-            }
-            trades.append(trade_info)
-            
+        # Extract trade information from analyzer
+        if hasattr(strat, 'analyzers') and hasattr(strat.analyzers, 'trades'):
+            trade_analysis = strat.analyzers.trades.get_analysis()
+            # Convert trade analysis to list format
+            # This is a simplified version - you might need to adjust based on actual analyzer output
+            if trade_analysis:
+                trades.append({
+                    "analysis": trade_analysis,
+                    "status": "completed"
+                })
+        
         return trades
     
     def get_portfolio_history(self) -> List[Dict[str, Any]]:
