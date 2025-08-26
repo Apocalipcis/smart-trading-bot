@@ -9,6 +9,7 @@ The trading bot is designed as a containerized application with the following co
 - **Backend API**: FastAPI application with structured logging
 - **Database**: SQLite with WAL mode for performance
 - **Data Storage**: Local file system with Parquet format
+- **Simulation Engine**: Paper trading environment with portfolio management
 - **Monitoring**: Health checks and structured logging
 - **CI/CD**: GitHub Actions pipeline
 
@@ -51,8 +52,10 @@ services:
     environment:
       - DATA_DIR=/data
       - DB_PATH=/data/app.db
+      - TRADING_MODE=simulation
+      - SIMULATION_INITIAL_CAPITAL=10000.0
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/status/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/status/health"]
 ```
 
 #### Development (`docker-compose.dev.yml`)
@@ -67,6 +70,7 @@ services:
     environment:
       - DEBUG_MODE=true
       - RELOAD=true
+      - TRADING_MODE=simulation
     command: ["uvicorn", "src.api.main:app", "--reload"]
 ```
 
@@ -126,7 +130,8 @@ Key configuration variables in `.env`:
 
 ```env
 # Trading Configuration
-TRADING_ENABLED=false
+TRADING_MODE=simulation
+TRADING_APPROVED=false
 ORDER_CONFIRMATION_REQUIRED=true
 MAX_OPEN_POSITIONS=5
 MAX_RISK_PER_TRADE=2.0
@@ -151,6 +156,13 @@ DEBUG_MODE=false
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 TELEGRAM_ENABLED=false
+
+# Simulation Configuration
+SIMULATION_INITIAL_CAPITAL=10000.0
+SIMULATION_COMMISSION=0.001
+SIMULATION_SLIPPAGE=0.0001
+SIMULATION_TICK_INTERVAL=5.0
+SIMULATION_STRATEGY_INTERVAL=60.0
 ```
 
 ### Data Directory Structure
@@ -178,6 +190,7 @@ TELEGRAM_ENABLED=false
 - **Detailed Health**: `GET /api/v1/status/health/detailed`
 - **Metrics**: `GET /api/v1/status/metrics`
 - **System Info**: `GET /api/v1/status/info`
+- **Simulation Status**: `GET /api/v1/simulation/status`
 
 ### Health Check Response
 
@@ -188,7 +201,9 @@ TELEGRAM_ENABLED=false
   "version": "1.0.0",
   "uptime": 3600.5,
   "database_connected": true,
-  "exchange_connected": true
+  "exchange_connected": true,
+  "simulation_running": true,
+  "trading_mode": "simulation"
 }
 ```
 
@@ -207,7 +222,8 @@ The application uses structured JSON logging with correlation IDs:
   "version": "1.0.0",
   "symbol": "BTCUSDT",
   "side": "BUY",
-  "confidence": 0.85
+  "confidence": 0.85,
+  "trading_mode": "simulation"
 }
 ```
 
@@ -277,6 +293,71 @@ pytest -m "integration" tests/
 pytest -m "slow" tests/
 ```
 
+## Simulation Engine Deployment
+
+### Simulation Mode Configuration
+
+The simulation engine runs by default in all environments:
+
+```env
+# Default simulation mode
+TRADING_MODE=simulation
+TRADING_APPROVED=false
+
+# Simulation parameters
+SIMULATION_INITIAL_CAPITAL=10000.0
+SIMULATION_COMMISSION=0.001
+SIMULATION_SLIPPAGE=0.0001
+SIMULATION_TICK_INTERVAL=5.0
+```
+
+### Production Simulation Setup
+
+For production simulation environments:
+
+```yaml
+# docker-compose.prod.yml
+services:
+  trading-bot:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - TRADING_MODE=simulation
+      - SIMULATION_INITIAL_CAPITAL=50000.0
+      - SIMULATION_TICK_INTERVAL=1.0
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/simulation/status"]
+```
+
+### Live Trading Deployment
+
+For live trading (requires explicit approval):
+
+```yaml
+# docker-compose.live.yml
+services:
+  trading-bot:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - TRADING_MODE=live
+      - TRADING_APPROVED=true
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+      - ORDER_CONFIRMATION_REQUIRED=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/status/health"]
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -301,6 +382,11 @@ pytest -m "slow" tests/
    - Verify all required services are running
    - Check environment configuration
 
+5. **Simulation Engine Issues**
+   - Check simulation status: `curl http://localhost:8000/api/v1/simulation/status`
+   - Reset simulation if needed: `curl -X POST http://localhost:8000/api/v1/simulation/reset`
+   - Verify WebSocket connections for price data
+
 ### Log Analysis
 
 ```bash
@@ -312,6 +398,9 @@ docker-compose logs | grep "ERROR"
 
 # Search for specific patterns
 docker-compose logs | grep "correlation_id"
+
+# Simulation-specific logs
+docker-compose logs | grep "simulation"
 ```
 
 ### Performance Monitoring
@@ -325,6 +414,9 @@ curl -w "@curl-format.txt" http://localhost:8000/api/v1/status/health
 
 # Check database performance
 docker exec -it smart-trading-bot sqlite3 /data/app.db "PRAGMA stats;"
+
+# Monitor simulation performance
+curl http://localhost:8000/api/v1/simulation/performance
 ```
 
 ## Security Considerations
@@ -334,6 +426,7 @@ docker exec -it smart-trading-bot sqlite3 /data/app.db "PRAGMA stats;"
 3. **Container Security**: Run as non-root user
 4. **Data Protection**: Encrypt sensitive data at rest
 5. **Access Control**: Implement proper authentication/authorization
+6. **Simulation Isolation**: Complete separation of simulation and live data
 
 ## Production Deployment
 
@@ -349,23 +442,33 @@ docker exec -it smart-trading-bot sqlite3 /data/app.db "PRAGMA stats;"
 ### Environment-Specific Configurations
 
 ```bash
-# Production
+# Production Simulation
 ENVIRONMENT=production
 DEBUG_MODE=false
 LOG_LEVEL=WARNING
-TRADING_ENABLED=true
+TRADING_MODE=simulation
+TRADING_APPROVED=false
+
+# Production Live Trading
+ENVIRONMENT=production
+DEBUG_MODE=false
+LOG_LEVEL=WARNING
+TRADING_MODE=live
+TRADING_APPROVED=true
 
 # Staging
 ENVIRONMENT=staging
 DEBUG_MODE=false
 LOG_LEVEL=INFO
-TRADING_ENABLED=false
+TRADING_MODE=simulation
+TRADING_APPROVED=false
 
 # Development
 ENVIRONMENT=development
 DEBUG_MODE=true
 LOG_LEVEL=DEBUG
-TRADING_ENABLED=false
+TRADING_MODE=simulation
+TRADING_APPROVED=false
 ```
 
 ## Support
@@ -385,3 +488,5 @@ For infrastructure issues:
 - CI/CD pipeline
 - Health monitoring
 - Structured logging
+- Simulation engine integration
+- Dual-mode deployment support

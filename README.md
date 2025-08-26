@@ -1,6 +1,6 @@
 # Smart Trading Bot
 
-A professional trading bot built with Python, FastAPI, and Backtrader for cryptocurrency trading on Binance Futures.
+A professional trading bot built with Python, FastAPI, and Backtrader for cryptocurrency trading on Binance Futures with comprehensive simulation capabilities.
 
 ## 🚀 Features
 
@@ -8,6 +8,7 @@ A professional trading bot built with Python, FastAPI, and Backtrader for crypto
 - **Backtesting Engine**: Full Backtrader integration with historical data
 - **Trading Strategies**: Plugin-based strategy system with Smart Money Concepts (SMC)
 - **Risk Management**: Configurable position sizing, stop-loss, and take-profit
+- **Simulation Engine**: Complete paper trading environment with dual-mode support
 - **Web Interface**: Modern SPA dashboard for monitoring and control
 - **Telegram Notifications**: Real-time alerts for signals and backtest results
 - **API-First Design**: RESTful API with WebSocket/SSE streaming support
@@ -31,6 +32,7 @@ smart-trading-bot/
 │   ├── backtests/         # Backtesting engine
 │   ├── strategies/        # Trading strategies (✅ COMPLETED)
 │   ├── orders/            # Order management
+│   ├── simulation/        # Simulation engine (✅ COMPLETED)
 │   └── storage/           # Database & file storage
 ├── web/                   # Frontend SPA
 ├── data/                  # Persistent data storage
@@ -44,6 +46,7 @@ smart-trading-bot/
 - **Data Layer**: Complete Binance integration with WebSocket streaming
 - **API Layer**: Full FastAPI implementation with all endpoints
 - **Strategies Package**: Complete trading strategy system with SMC implementation
+- **Simulation Engine**: Complete paper trading environment with portfolio management
 - **Structured Logging**: JSON logs with correlation IDs
 - **Telegram Integration**: Rich notification system
 - **Health Monitoring**: System status and metrics
@@ -58,6 +61,24 @@ smart-trading-bot/
 - **Web UI**: React/Vite frontend
 - **Docker**: Containerization
 - **CI/CD**: GitHub Actions pipeline
+
+## 🎯 Trading Modes
+
+The bot supports two distinct trading modes:
+
+### Simulation Mode (Default)
+- **Paper Trading**: Risk-free environment for strategy testing
+- **Real-time Data**: Uses actual WebSocket price feeds
+- **Portfolio Management**: Full P&L tracking and position management
+- **No API Keys Required**: Safe for development and testing
+- **Complete Isolation**: Separate database tables and storage
+
+### Live Trading Mode
+- **Real Trading**: Actual order execution on Binance Futures
+- **Approval Required**: Explicit approval needed for live trading
+- **API Keys Required**: Valid Binance API credentials
+- **Risk Management**: Comprehensive position and risk controls
+- **Audit Trail**: Complete logging of all trading activities
 
 ## 🎯 Trading Strategies
 
@@ -177,6 +198,7 @@ smart-trading-bot/
 │   ├── api/             # FastAPI application
 │   ├── data/            # Data layer
 │   ├── strategies/      # Trading strategies
+│   ├── simulation/      # Simulation engine
 │   └── backtests/       # Backtesting engine
 ├── tests/               # Test suite
 ├── examples/            # Usage examples
@@ -190,3 +212,157 @@ smart-trading-bot/
 - **No requirements.txt**: Dependencies managed centrally in pyproject.toml
 - **conftest.py**: Essential for pytest configuration and shared fixtures
 - **Modern tooling**: Ruff, Black, MyPy configured in pyproject.toml
+
+## 📚 Documentation
+
+### Core Documentation
+- **[Technical Specification](trading_bot_spec.md)**: Complete technical overview
+- **[Simulation Engine](SIMULATION_ENGINE.md)**: Paper trading environment
+- **[Infrastructure](INFRASTRUCTURE.md)**: Deployment and monitoring
+- **[Debug Guide](DEBUG.md)**: Development and troubleshooting
+
+### Component Documentation
+- **[Data Layer](src/data/README.md)**: Binance integration and data handling
+- **[Strategies](src/strategies/README.md)**: Trading strategy system
+- **[Examples](examples/README.md)**: Usage examples and demos
+
+### API Documentation
+- **Interactive API Docs**: Available at `/docs` when running the server
+- **OpenAPI Schema**: Available at `/openapi.json`
+- **API Examples**: See `examples/` directory for usage examples
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### Import Errors
+```bash
+# Solution: Install in development mode
+python install_dev.py
+
+# Or activate virtual environment
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+```
+
+#### Docker Build Issues
+```bash
+# Use debug build for detailed logging
+bash scripts/debug-build.sh
+
+# Or build with verbose output
+docker build -f Dockerfile.debug -t smart-trading-bot:debug .
+```
+
+#### API Connection Issues
+```bash
+# Check if server is running
+curl http://localhost:8000/api/v1/status/health
+
+# Check logs
+docker-compose logs -f trading-bot
+```
+
+#### Simulation Engine Issues
+```bash
+# Reset simulation
+curl -X POST http://localhost:8000/api/v1/simulation/reset
+
+# Check simulation status
+curl http://localhost:8000/api/v1/simulation/status
+```
+
+### Performance Issues
+
+#### High Memory Usage
+- Reduce simulation tick intervals
+- Limit portfolio snapshots
+- Clear old data periodically
+
+#### Slow API Responses
+- Check database performance
+- Monitor WebSocket connections
+- Review rate limiting settings
+
+### Debug Mode
+
+Enable debug logging:
+```bash
+# Set environment variable
+export DEBUG_MODE=true
+
+# Or in .env file
+DEBUG_MODE=true
+```
+
+## 🔒 Security
+
+### API Key Management
+- Never commit API keys to version control
+- Use environment variables for sensitive data
+- Rotate keys regularly
+- Use read-only keys for testing
+
+### Live Trading Protection
+- Explicit approval required for live trading
+- Simulation mode by default
+- Complete audit trail
+- Risk management controls
+
+## 📊 Monitoring
+
+### Health Checks
+```bash
+# Basic health check
+curl http://localhost:8000/api/v1/status/health
+
+# Detailed health check
+curl http://localhost:8000/api/v1/status/health/detailed
+
+# System metrics
+curl http://localhost:8000/api/v1/status/metrics
+```
+
+### Logging
+- Structured JSON logging
+- Correlation IDs for request tracking
+- Log levels: DEBUG, INFO, WARNING, ERROR
+- Centralized log aggregation
+
+## 🤝 Contributing
+
+### Development Setup
+1. Fork the repository
+2. Create a feature branch
+3. Install development dependencies
+4. Run tests and linting
+5. Submit a pull request
+
+### Code Quality
+```bash
+# Run linting
+ruff check src/
+
+# Format code
+black src/
+
+# Type checking
+mypy src/
+
+# Run tests
+pytest tests/
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## ⚠️ Disclaimer
+
+This software is for educational and research purposes. Trading cryptocurrencies involves substantial risk of loss. Always test strategies thoroughly in simulation mode before using real money. The authors are not responsible for any financial losses incurred through the use of this software.
+
+---
+
+**Happy Trading! 🚀**
+
+*Remember: Start with simulation mode and always use proper risk management.*

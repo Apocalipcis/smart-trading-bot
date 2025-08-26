@@ -5,10 +5,10 @@
 - Language: **Python**
 - Framework: **Backtrader** ([repository](https://github.com/mementum/backtrader))
 - Architecture: **Docker + FastAPI + SPA Web Interface**
-- Configuration: ``** file**
+- Configuration: **Environment variables** file
 - Modes of operation:
-  - **View-only** (without keys) — signals + backtest.
-  - **Trading** (with keys) — order execution based on signals.
+  - **Simulation Mode** (default) — paper trading with real-time data
+  - **Live Trading Mode** (with approval) — real order execution on Binance Futures
 
 ## Web Interface
 
@@ -19,17 +19,26 @@ At least 2 tabs:
 - Add / remove trading pairs.
 - Display signals for each pair (live/last N events).
 - If keys are provided — enable trading.
-- Checkbox: **“Confirm order execution”**
+- Checkbox: **"Confirm order execution"**
   - If disabled — orders are executed automatically.
   - If enabled — a modal window with confirmation (details: pair, volume, order type, SL/TP) is shown.
   - Unconfirmed signals are stored in the *pending confirmation* list.
+- **Simulation Controls**: Start/stop simulation, reset portfolio, view performance
 
 ### 2. Backtest
 
 - Select pair, strategy, timeframes, data range (1–30 days).
-- Start backtest → results stored locally. 
+- Start backtest → results stored locally. 
 - Table of previous results (strategy, timeframe, parameters).
-- Button **“Detailed statistics”** next to each test opens a modal window; metrics (win-rate, entries/exits, TP/SL, number of trades) are displayed only after clicking. Nearby buttons **“Delete result”** or **“Delete all”** are available.
+- Button **"Detailed statistics"** next to each test opens a modal window; metrics (win-rate, entries/exits, TP/SL, number of trades) are displayed only after clicking. Nearby buttons **"Delete result"** or **"Delete all"** are available.
+
+### 3. Simulation (New)
+
+- **Portfolio Overview**: Current value, P&L, open positions
+- **Performance Metrics**: Sharpe ratio, drawdown, win rate
+- **Trade History**: Complete list of executed trades
+- **Position Management**: View and manage open positions
+- **Settings**: Simulation parameters and risk management
 
 ## API (FastAPI)
 
@@ -40,6 +49,14 @@ At least 2 tabs:
 - `/settings` — read/update settings (including order confirmation).
 - `/status/health` — health check.
 - `/notifications/test` — test message in Telegram (if configured).
+- `/simulation/status` — simulation engine status.
+- `/simulation/portfolio` — current portfolio information.
+- `/simulation/positions` — open positions.
+- `/simulation/trades` — trade history.
+- `/simulation/performance` — performance metrics.
+- `/simulation/reset` — reset simulation.
+- `/simulation/start` — start simulation engine.
+- `/simulation/stop` — stop simulation engine.
 
 ## Services and Components
 
@@ -59,6 +76,7 @@ At least 2 tabs:
     - `/data/backtests/{date}/{pair}_{strategy}_{tf}.json`
     - `/data/reports/{id}/...`
   - **Backtest artifacts** — in `/data/artifacts/` (charts, reports).
+  - **Simulation data** — separate tables with `_sim` suffix for complete isolation.
 
 - **Strategies**:
 
@@ -76,10 +94,21 @@ At least 2 tabs:
   - Position size calculated by % risk and SL; leverage control.
   - Idempotent requests.
 
+- **Simulation Engine**:
+
+  - Complete paper trading environment.
+  - Real-time price updates from WebSocket feeds.
+  - Portfolio management with P&L tracking.
+  - Order processing with slippage and commission simulation.
+  - Performance metrics and portfolio snapshots.
+  - Complete data isolation from live trading.
+
 - **Security**:
 
   - Keys stored in `.env`.
   - No logging of sensitive data.
+  - Explicit approval required for live trading.
+  - Simulation mode by default.
 
 - **Monitoring**:
 
@@ -94,8 +123,13 @@ At least 2 tabs:
   - Accuracy (UTC, no look-ahead bias).
   - Include commissions, slippage, funding (futures) in PnL.
   - Margin rules and leverage (initial/maintenance margin).
-  - Determinism: random\_seed, UTC, no look-ahead.
+  - Determinism: random_seed, UTC, no look-ahead.
   - Candle data integrity check (no gaps/duplicates).
+- **Simulation**:
+  - Real-time performance with ≤5s tick intervals.
+  - Memory usage <500MB for typical portfolios.
+  - Database operations <100ms response time.
+  - Complete isolation from live trading data.
 - **Tests**: coverage ≥70%.
 - **Style**: PEP8.
 - **CI/CD**:
@@ -108,10 +142,11 @@ At least 2 tabs:
 - Max number of open positions.
 - Mandatory minimum RR ≥ 3 in backtests and signals.
 - Global/per-class RR ≥ 3 enforcement (live and backtest).
+- Simulation mode protection (no real money at risk).
 
 ## Additional (optional)
 
-- Paper trading mode.
+- Paper trading mode (implemented as simulation engine).
 - Audit log of actions and decisions.
 - Export results (CSV/JSON).
 - Dark theme, localization EN/UK.
@@ -126,6 +161,11 @@ At least 2 tabs:
     REST_URL=https://...
     DB_PATH=/data/app.db
     DATA_DIR=/data
+    TRADING_MODE=simulation
+    TRADING_APPROVED=false
+    SIMULATION_INITIAL_CAPITAL=10000.0
+    SIMULATION_COMMISSION=0.001
+    SIMULATION_SLIPPAGE=0.0001
     ```
 
 ## Implementation Steps
@@ -142,7 +182,7 @@ All timestamps in UTC. No look-ahead bias.
 ### STEP 2: API (FastAPI) ✅
 Implement package `src/api`:
 - main.py with FastAPI app + routers.
-- Routers: pairs, signals, backtests, orders, settings, status, notifications.
+- Routers: pairs, signals, backtests, orders, settings, status, notifications, simulation.
 - schemas.py with Pydantic models.
 - Enforce TRADING_ENABLED flag (view-only mode if no keys).
 - SSE/WS stream for /signals.
@@ -177,8 +217,16 @@ Implement package `src/storage`:
 - db.py (SQLite app.db, WAL mode, indexes).
 - configs.py (settings CRUD).
 - files.py (helpers for candle/backtest/report paths).
+- simulation.py (simulation-specific database schema).
 
-### STEP 7: Monitoring & CI ✅
+### STEP 7: Simulation Engine ✅
+Implement package `src/simulation`:
+- engine.py (main simulation engine with portfolio management).
+- portfolio.py (position tracking and P&L calculation).
+- config.py (simulation configuration and mode management).
+- Integration with orders package via adapters.
+
+### STEP 8: Monitoring & CI ✅
 Add:
 - Logging config (JSON structured).
 - /status/health endpoint.
@@ -187,21 +235,19 @@ Add:
 - GitHub Actions CI: lint (ruff), mypy, pytest, build image.
 - .env.example file with TELEGRAM_*, EXCHANGE, etc.
 
-### STEP 8: Web UI (SPA) ✅
+### STEP 9: Web UI (SPA) ✅
 Scaffold minimal SPA (React/Vite or Svelte):
 - Dashboard: pairs CRUD, live signals, trading toggle, confirm-order checkbox, pending list.
 - Backtest tab: form (pair/strategy/TF/range), table of runs, detailed modal, delete.
+- Simulation tab: portfolio overview, performance metrics, trade history, position management.
 - Dark theme, EN/UK i18n placeholders.
 Strict API calls to FastAPI backend, no extra endpoints.
 
-### STEP 9: Simulation Engine Integration ✅
-Integrate simulation engine with existing components:
-- Connect SimulationEngine to FastAPI endpoints.
-- Integrate with data layer for real-time price feeds.
-- Add simulation mode to trading configuration.
-- Create simulation-specific database tables and storage.
-- Add simulation controls to Web UI.
-- Implement simulation vs live mode switching.
-- Add comprehensive testing for simulation features.
-- Create simulation performance monitoring.
+### STEP 10: Integration & Testing ✅
+Complete integration testing:
+- End-to-end simulation workflows.
+- API endpoint validation.
+- Performance testing.
+- Security testing.
+- Documentation updates.
 
