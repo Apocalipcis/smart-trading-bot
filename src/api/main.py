@@ -18,7 +18,8 @@ from .routers import (
     pairs,
     settings,
     signals,
-    status
+    status,
+    simulation
 )
 from ..startup import create_startup_event_handler, create_shutdown_event_handler
 
@@ -103,6 +104,7 @@ app.include_router(orders.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(status.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
+app.include_router(simulation.router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -128,7 +130,8 @@ async def api_root():
             "orders": "/api/v1/orders",
             "settings": "/api/v1/settings",
             "status": "/api/v1/status",
-            "notifications": "/api/v1/notifications"
+            "notifications": "/api/v1/notifications",
+            "simulation": "/api/v1/simulation"
         },
         "docs": "/docs"
     }
