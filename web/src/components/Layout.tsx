@@ -88,13 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </nav>
 
-        {/* Status indicator */}
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-            <span className="text-sm text-green-700 dark:text-green-300">System Online</span>
-          </div>
-        </div>
+
       </div>
 
       {/* Main content */}
@@ -112,6 +106,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* System Status */}
+              <div className="flex items-center px-3 py-1 bg-green-50 dark:bg-green-900/20 rounded-full">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                <span className="text-xs font-medium text-green-700 dark:text-green-300">Online</span>
+              </div>
+
               {/* Dark mode toggle */}
               <button
                 onClick={toggleDarkMode}

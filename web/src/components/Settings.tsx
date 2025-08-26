@@ -129,14 +129,14 @@ const Settings: React.FC = () => {
               </div>
               <div className="flex-shrink-0">
                 <button
-                  onClick={() => handleInputChange('order_confirmation_required', !formData.order_confirmation_required)}
+                  onClick={() => handleInputChange('order_confirmation_required', !(formData?.order_confirmation_required ?? true))}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.order_confirmation_required ? 'bg-primary-600' : 'bg-gray-200'
+                    (formData?.order_confirmation_required ?? true) ? 'bg-primary-600' : 'bg-gray-200'
                   }`}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      formData.order_confirmation_required ? 'translate-x-6' : 'translate-x-1'
+                      (formData?.order_confirmation_required ?? true) ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>
@@ -147,14 +147,14 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Max Open Positions
               </label>
-              <input
-                type="number"
-                value={formData.max_open_positions || 0}
-                onChange={(e) => handleInputChange('max_open_positions', parseInt(e.target.value))}
-                className="input-field"
-                min="1"
-                max="50"
-              />
+                             <input
+                 type="number"
+                 value={formData?.max_open_positions || 0}
+                 onChange={(e) => handleInputChange('max_open_positions', parseInt(e.target.value))}
+                 className="input-field"
+                 min="1"
+                 max="50"
+               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Maximum number of simultaneous open positions
               </p>
@@ -164,15 +164,15 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Risk per Trade (%)
               </label>
-              <input
-                type="number"
-                value={formData.risk_per_trade || 0}
-                onChange={(e) => handleInputChange('risk_per_trade', parseFloat(e.target.value))}
-                className="input-field"
-                min="0.1"
-                max="10"
-                step="0.1"
-              />
+                             <input
+                 type="number"
+                 value={formData?.risk_per_trade || 0}
+                 onChange={(e) => handleInputChange('risk_per_trade', parseFloat(e.target.value))}
+                 className="input-field"
+                 min="0.1"
+                 max="10"
+                 step="0.1"
+               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Percentage of account balance to risk per trade
               </p>
@@ -182,15 +182,15 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Default Leverage
               </label>
-              <input
-                type="number"
-                value={formData.default_leverage || 1}
-                onChange={(e) => handleInputChange('default_leverage', parseFloat(e.target.value))}
-                className="input-field"
-                min="1"
-                max="100"
-                step="1"
-              />
+                             <input
+                 type="number"
+                 value={formData?.default_leverage || 1}
+                 onChange={(e) => handleInputChange('default_leverage', parseFloat(e.target.value))}
+                 className="input-field"
+                 min="1"
+                 max="100"
+                 step="1"
+               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Default leverage for futures trading
               </p>
@@ -216,18 +216,18 @@ const Settings: React.FC = () => {
                 </p>
               </div>
               <div className="flex-shrink-0">
-                <button
-                  onClick={() => handleInputChange('telegram_enabled', !formData.telegram_enabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.telegram_enabled ? 'bg-primary-600' : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      formData.telegram_enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                                 <button
+                   onClick={() => handleInputChange('telegram_enabled', !(formData?.telegram_enabled ?? false))}
+                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                     (formData?.telegram_enabled ?? false) ? 'bg-primary-600' : 'bg-gray-200'
+                   }`}
+                 >
+                   <span
+                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                       (formData?.telegram_enabled ?? false) ? 'translate-x-6' : 'translate-x-1'
+                     }`}
+                   />
+                 </button>
               </div>
             </div>
 
@@ -235,13 +235,13 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Telegram Bot Token
               </label>
-              <input
-                type="password"
-                value={formData.telegram_bot_token || ''}
-                onChange={(e) => handleInputChange('telegram_bot_token', e.target.value)}
-                className="input-field"
-                placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-              />
+                             <input
+                 type="password"
+                 value={formData?.telegram_bot_token || ''}
+                 onChange={(e) => handleInputChange('telegram_bot_token', e.target.value)}
+                 className="input-field"
+                 placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Bot token from @BotFather
               </p>
@@ -251,23 +251,23 @@ const Settings: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Telegram Chat ID
               </label>
-              <input
-                type="text"
-                value={formData.telegram_chat_id || ''}
-                onChange={(e) => handleInputChange('telegram_chat_id', e.target.value)}
-                className="input-field"
-                placeholder="123456789"
-              />
+                             <input
+                 type="text"
+                 value={formData?.telegram_chat_id || ''}
+                 onChange={(e) => handleInputChange('telegram_chat_id', e.target.value)}
+                 className="input-field"
+                 placeholder="123456789"
+               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Your Telegram chat ID
               </p>
             </div>
 
-            <button
-              onClick={handleTestNotification}
-              disabled={testingNotification || !formData.telegram_enabled}
-              className="btn-secondary flex items-center w-full justify-center"
-            >
+                         <button
+               onClick={handleTestNotification}
+               disabled={testingNotification || !(formData?.telegram_enabled ?? false)}
+               className="btn-secondary flex items-center w-full justify-center"
+             >
               <TestTube className="w-4 h-4 mr-2" />
               {testingNotification ? 'Sending...' : 'Test Notification'}
             </button>
@@ -333,42 +333,42 @@ const Settings: React.FC = () => {
       <div className="card p-6">
         <h2 className="text-lg font-semibold mb-6">Current Configuration</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Trading Status:</span>
-            <span className={`font-medium ${
-              formData.trading_enabled ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {formData.trading_enabled ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Order Confirmation:</span>
-            <span className={`font-medium ${
-              formData.order_confirmation_required ? 'text-green-600' : 'text-yellow-600'
-            }`}>
-              {formData.order_confirmation_required ? 'Required' : 'Auto'}
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Max Positions:</span>
-            <span className="font-medium">{formData.max_open_positions}</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Risk per Trade:</span>
-            <span className="font-medium">{formData.risk_per_trade}%</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Default Leverage:</span>
-            <span className="font-medium">{formData.default_leverage}x</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Telegram:</span>
-            <span className={`font-medium ${
-              formData.telegram_enabled ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {formData.telegram_enabled ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
+                     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+             <span className="text-gray-500 dark:text-gray-400">Trading Status:</span>
+             <span className={`font-medium ${
+               (formData?.trading_enabled ?? false) ? 'text-green-600' : 'text-red-600'
+             }`}>
+               {(formData?.trading_enabled ?? false) ? 'Enabled' : 'Disabled'}
+             </span>
+           </div>
+           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+             <span className="text-gray-500 dark:text-gray-400">Order Confirmation:</span>
+             <span className={`font-medium ${
+               (formData?.order_confirmation_required ?? true) ? 'text-green-600' : 'text-yellow-600'
+             }`}>
+               {(formData?.order_confirmation_required ?? true) ? 'Required' : 'Auto'}
+             </span>
+           </div>
+           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+             <span className="text-gray-500 dark:text-gray-400">Max Positions:</span>
+             <span className="font-medium">{formData?.max_open_positions || 0}</span>
+           </div>
+           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+             <span className="text-gray-500 dark:text-gray-400">Risk per Trade:</span>
+             <span className="font-medium">{formData?.risk_per_trade || 0}%</span>
+           </div>
+           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+             <span className="text-gray-500 dark:text-gray-400">Default Leverage:</span>
+             <span className="font-medium">{formData?.default_leverage || 1}x</span>
+           </div>
+           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+             <span className="text-gray-500 dark:text-gray-400">Telegram:</span>
+             <span className={`font-medium ${
+               (formData?.telegram_enabled ?? false) ? 'text-green-600' : 'text-red-600'
+             }`}>
+               {(formData?.telegram_enabled ?? false) ? 'Enabled' : 'Disabled'}
+             </span>
+           </div>
         </div>
       </div>
     </div>
