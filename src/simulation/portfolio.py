@@ -83,12 +83,12 @@ class SimulationPortfolio:
         # Create initial snapshot
         self._create_snapshot()
     
-    async def submit_order(self, order: Order) -> bool:
+    async def submit_order(self, order: Order, price_data: Optional[Dict[str, Decimal]] = None) -> bool:
         """Submit an order to the portfolio."""
         async with self._lock:
             try:
                 if order.order_type.value == "market":
-                    return await self._execute_market_order(order)
+                    return await self._execute_market_order(order, price_data)
                 elif order.order_type.value == "limit":
                     return await self._queue_limit_order(order)
                 else:
@@ -98,10 +98,10 @@ class SimulationPortfolio:
                 logger.error(f"Error submitting order: {e}")
                 return False
     
-    async def _execute_market_order(self, order: Order) -> bool:
+    async def _execute_market_order(self, order: Order, price_data: Optional[Dict[str, Decimal]] = None) -> bool:
         """Execute a market order immediately."""
         # Calculate execution price with slippage
-        execution_price = self._calculate_execution_price(order)
+        execution_price = self._calculate_execution_price(order, price_data)
         
         # Calculate commission
         commission_amount = execution_price * order.quantity * self.commission
@@ -143,6 +143,9 @@ class SimulationPortfolio:
                           commission=commission_amount,
                           filled_at=datetime.now(timezone.utc))
         
+        # Create new snapshot after trade
+        self._create_snapshot()
+        
         logger.info(f"Executed market order: {order.side} {order.quantity} {order.pair} @ {execution_price}")
         return True
     
@@ -154,17 +157,19 @@ class SimulationPortfolio:
         logger.info(f"Queued limit order: {order.side} {order.quantity} {order.pair} @ {order.price}")
         return True
     
-    def _calculate_execution_price(self, order: Order) -> Decimal:
+    def _calculate_execution_price(self, order: Order, price_data: Optional[Dict[str, Decimal]] = None) -> Decimal:
         """Calculate execution price with slippage."""
-        # This is a simplified implementation
-        # In a real implementation, this would use actual bid/ask prices
-        base_price = Decimal("50000")  # Placeholder - should come from price feed
+        # Use provided price data or fallback to placeholder
+        if price_data and order.pair in price_data:
+            base_price = price_data[order.pair]
+        else:
+            base_price = Decimal("50000")  # Placeholder - should come from price feed
         
         if order.side == OrderSide.BUY:
-            # Buy at ask price (higher)
+            # Buy at ask price (higher) - add commission to price
             return base_price * (Decimal("1") + self.commission)
         else:
-            # Sell at bid price (lower)
+            # Sell at bid price (lower) - subtract commission from price
             return base_price * (Decimal("1") - self.commission)
     
     async def _update_position(self, pair: str, side: OrderSide, quantity: Decimal, price: Decimal) -> None:

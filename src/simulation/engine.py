@@ -111,8 +111,9 @@ class SimulationEngine:
                 # Store order
                 self.orders[sim_order_id] = order
                 
-                # Submit to portfolio
-                success = await self.portfolio.submit_order(order)
+                # Submit to portfolio with current price data
+                price_dict = {pair: data.mid_price for pair, data in self.price_data.items()}
+                success = await self.portfolio.submit_order(order, price_dict)
                 
                 if success:
                     self.stats["orders_submitted"] += 1

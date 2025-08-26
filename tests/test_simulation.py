@@ -110,6 +110,14 @@ class TestSimulationEngine:
         """Test portfolio value calculation."""
         await engine.start()
         
+        # Set initial price data
+        await engine.update_price(
+            pair="BTCUSDT",
+            bid=Decimal("50000"),
+            ask=Decimal("50001"),
+            last=Decimal("50000.5")
+        )
+        
         # Initial value should match initial capital
         initial_value = engine.get_portfolio_value()
         assert initial_value == Decimal("10000.0")
@@ -156,6 +164,14 @@ class TestSimulationEngine:
     async def test_engine_reset(self, engine):
         """Test engine reset functionality."""
         await engine.start()
+        
+        # Set initial price data
+        await engine.update_price(
+            pair="BTCUSDT",
+            bid=Decimal("50000"),
+            ask=Decimal("50001"),
+            last=Decimal("50000.5")
+        )
         
         # Submit an order to create some state
         order = Order(
