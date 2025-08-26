@@ -45,10 +45,14 @@ const Backtests: React.FC = () => {
         apiClient.getBacktests(),
         apiClient.getPairs(),
       ]);
-      setBacktests(backtestsData);
-      setPairs(pairsData);
+      // Ensure backtests is always an array
+      setBacktests(Array.isArray(backtestsData) ? backtestsData : []);
+      setPairs(Array.isArray(pairsData) ? pairsData : []);
     } catch (error) {
       console.error('Failed to load backtests data:', error);
+      // Ensure arrays are set to empty arrays on error
+      setBacktests([]);
+      setPairs([]);
     } finally {
       setLoading(false);
     }

@@ -19,7 +19,9 @@ class ApiClient {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // In Docker, the API is served through nginx proxy at the same domain
+    // Use relative URL when no explicit API URL is provided
+    this.baseURL = import.meta.env.VITE_API_URL || '';
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 10000,

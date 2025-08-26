@@ -17,10 +17,13 @@ const Settings: React.FC = () => {
   const loadSettings = async () => {
     try {
       const settingsData = await apiClient.getSettings();
-      setSettings(settingsData);
-      setFormData(settingsData);
+      // Ensure we have valid settings data
+      const validSettings = settingsData || {};
+      setSettings(validSettings);
+      setFormData(validSettings);
     } catch (error) {
       console.error('Failed to load settings:', error);
+      // Keep default values on error
     } finally {
       setLoading(false);
     }
@@ -101,14 +104,14 @@ const Settings: React.FC = () => {
               </div>
               <div className="flex-shrink-0">
                 <button
-                  onClick={() => handleInputChange('trading_enabled', !formData.trading_enabled)}
+                  onClick={() => handleInputChange('trading_enabled', !(formData?.trading_enabled ?? false))}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.trading_enabled ? 'bg-primary-600' : 'bg-gray-200'
+                    (formData?.trading_enabled ?? false) ? 'bg-primary-600' : 'bg-gray-200'
                   }`}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      formData.trading_enabled ? 'translate-x-6' : 'translate-x-1'
+                      (formData?.trading_enabled ?? false) ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>
