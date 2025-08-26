@@ -128,3 +128,80 @@ At least 2 tabs:
     DATA_DIR=/data
     ```
 
+## Implementation Steps
+
+### STEP 1: Data Layer ✅
+Implement package `src/data`:
+- binance_client.py (REST + WS client for Binance USDT-M Futures).
+- stream.py (WS manager with auto-reconnect, deduplication, resync via REST snapshot).
+- feed.py (custom Backtrader data feed subclass pulling from WS/Parquet).
+- validators.py (exchange rules: tickSize, stepSize, precision, minNotional).
+- rate_limit.py (queue with retries/backoff/idempotency).
+All timestamps in UTC. No look-ahead bias.
+
+### STEP 2: API (FastAPI) ✅
+Implement package `src/api`:
+- main.py with FastAPI app + routers.
+- Routers: pairs, signals, backtests, orders, settings, status, notifications.
+- schemas.py with Pydantic models.
+- Enforce TRADING_ENABLED flag (view-only mode if no keys).
+- SSE/WS stream for /signals.
+- Structured logs with correlation_id middleware.
+
+### STEP 3: Backtests ✅
+Implement package `src/backtests`:
+- runner.py using Backtrader.Cerebro (attach strategy, feed, run).
+- storage.py (save results under /data/backtests/, /data/artifacts/).
+- metrics.py (win-rate, trades, TP/SL, commissions, slippage, funding).
+- integrity.py (check candles: no gaps/dupes).
+- CLI entrypoint.
+Deterministic: random_seed, UTC.
+
+### STEP 4: Strategies ✅
+Implement package `src/strategies`:
+- base.py (abstract Backtrader.Strategy with generate_signals contract).
+- registry.py (auto-discovery of *.py strategies, versioning).
+- smc.py (baseline Smart Money strategy).
+Signals: side, entry, SL, TP, confidence.
+Include synthetic data tests.
+
+### STEP 5: Orders ✅
+Implement package `src/orders`:
+- sizing.py (risk% based position sizing, leverage-aware).
+- types.py (market, limit, stop-market, stop-limit, trailing-stop).
+- queue.py (idempotent submissions, dedupe).
+- pending.py (confirmation store with TTL).
+
+### STEP 6: Storage ✅
+Implement package `src/storage`:
+- db.py (SQLite app.db, WAL mode, indexes).
+- configs.py (settings CRUD).
+- files.py (helpers for candle/backtest/report paths).
+
+### STEP 7: Monitoring & CI ✅
+Add:
+- Logging config (JSON structured).
+- /status/health endpoint.
+- Dockerfile (multi-stage slim).
+- docker-compose.yml with /data volume.
+- GitHub Actions CI: lint (ruff), mypy, pytest, build image.
+- .env.example file with TELEGRAM_*, EXCHANGE, etc.
+
+### STEP 8: Web UI (SPA) ✅
+Scaffold minimal SPA (React/Vite or Svelte):
+- Dashboard: pairs CRUD, live signals, trading toggle, confirm-order checkbox, pending list.
+- Backtest tab: form (pair/strategy/TF/range), table of runs, detailed modal, delete.
+- Dark theme, EN/UK i18n placeholders.
+Strict API calls to FastAPI backend, no extra endpoints.
+
+### STEP 9: Simulation Engine Integration ✅
+Integrate simulation engine with existing components:
+- Connect SimulationEngine to FastAPI endpoints.
+- Integrate with data layer for real-time price feeds.
+- Add simulation mode to trading configuration.
+- Create simulation-specific database tables and storage.
+- Add simulation controls to Web UI.
+- Implement simulation vs live mode switching.
+- Add comprehensive testing for simulation features.
+- Create simulation performance monitoring.
+
