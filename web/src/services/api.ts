@@ -12,6 +12,11 @@ import {
   Settings,
   SystemStatus,
   PendingConfirmation,
+  AvailableTimeframes,
+  TimeframeConstraint,
+  AvailableTimeframe,
+  TimeframeRole,
+  StrategyMetadata,
 } from '../types/api';
 
 class ApiClient {
@@ -98,6 +103,60 @@ class ApiClient {
 
   async deleteAllBacktests(): Promise<void> {
     await this.client.delete('/api/v1/backtests');
+  }
+
+  // Markets
+  async getAvailableTimeframes(): Promise<AvailableTimeframes> {
+    const response = await this.client.get<ApiResponse<AvailableTimeframes>>('/api/v1/markets/timeframes');
+    return response.data.data;
+  }
+
+  async getTimeframeRoleConstraints(): Promise<TimeframeConstraint[]> {
+    const response = await this.client.get<ApiResponse<TimeframeConstraint[]>>('/api/v1/markets/timeframes/roles');
+    return response.data.data;
+  }
+
+  async getTimeframeInfo(timeframe: string): Promise<AvailableTimeframe> {
+    const response = await this.client.get<ApiResponse<AvailableTimeframe>>(`/api/v1/markets/timeframes/${timeframe}`);
+    return response.data.data;
+  }
+
+  async validateTimeframeRoles(timeframes: string[], tfRoles: Record<string, TimeframeRole>): Promise<any> {
+    const params = {
+      timeframes: timeframes.join(','),
+      tf_roles: JSON.stringify(tfRoles)
+    };
+    const response = await this.client.get<ApiResponse<any>>('/api/v1/markets/timeframes/validate', { params });
+    return response.data.data;
+  }
+
+  // Strategies
+  async getStrategies(): Promise<StrategyMetadata[]> {
+    const response = await this.client.get<ApiResponse<StrategyMetadata[]>>('/api/v1/strategies');
+    return response.data.data;
+  }
+
+  async getStrategy(strategyName: string): Promise<StrategyMetadata> {
+    const response = await this.client.get<ApiResponse<StrategyMetadata>>(`/api/v1/strategies/${strategyName}`);
+    return response.data.data;
+  }
+
+  async validateStrategyRequirements(
+    strategyName: string, 
+    timeframes: string[], 
+    tfRoles: Record<string, TimeframeRole>
+  ): Promise<any> {
+    const params = {
+      timeframes: timeframes.join(','),
+      tf_roles: JSON.stringify(tfRoles)
+    };
+    const response = await this.client.get<ApiResponse<any>>(`/api/v1/strategies/${strategyName}/validate`, { params });
+    return response.data.data;
+  }
+
+  async getStrategyParameters(strategyName: string): Promise<any> {
+    const response = await this.client.get<ApiResponse<any>>(`/api/v1/strategies/${strategyName}/parameters`);
+    return response.data.data;
   }
 
   // Orders

@@ -36,24 +36,85 @@ export interface Signal {
   status: 'active' | 'executed' | 'cancelled' | 'expired';
 }
 
+// Timeframe role types
+export type TimeframeRole = 'HTF' | 'LTF';
+
+export interface TimeframeConstraint {
+  role: TimeframeRole;
+  min_timeframe: string;
+  max_timeframe: string;
+  description: string;
+}
+
+export interface AvailableTimeframe {
+  timeframe: string;
+  description: string;
+  minutes: number;
+  supported_roles: TimeframeRole[];
+  is_active: boolean;
+}
+
+export interface AvailableTimeframes {
+  timeframes: AvailableTimeframe[];
+  default_htf: string;
+  default_ltf: string;
+  role_constraints: TimeframeConstraint[];
+}
+
+export interface StrategyMetadata {
+  name: string;
+  description: string;
+  version: string;
+  required_roles: TimeframeRole[];
+  role_constraints: TimeframeConstraint[];
+  parameters: Record<string, any>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Backtest types
 export interface BacktestConfig {
-  pair_id: string;
+  pairs: string[];
   strategy: string;
-  timeframe: string;
+  timeframes: string[];
+  tf_roles: Record<string, TimeframeRole>;
   start_date: string;
   end_date: string;
   initial_balance: number;
   risk_per_trade: number;
   leverage: number;
+  parameters?: Record<string, any>;
+  
+  // Legacy support
+  pair_id?: string;
+  timeframe?: string;
 }
 
 export interface BacktestResult {
   id: string;
-  config: BacktestConfig;
-  status: 'running' | 'completed' | 'failed';
+  pairs: string[];
+  strategy: string;
+  timeframes: string[];
+  tf_roles: Record<string, TimeframeRole>;
+  start_date: string;
+  end_date: string;
+  initial_balance: number;
+  final_balance: number;
+  total_return: number;
+  win_rate: number;
+  total_trades: number;
+  profitable_trades: number;
+  max_drawdown: number;
+  sharpe_ratio: number;
   created_at: string;
   completed_at?: string;
+  parameters?: Record<string, any>;
+  artifacts_path?: string;
+  
+  // Legacy support
+  config?: BacktestConfig;
+  status?: 'running' | 'completed' | 'failed';
   metrics?: BacktestMetrics;
   error?: string;
 }
