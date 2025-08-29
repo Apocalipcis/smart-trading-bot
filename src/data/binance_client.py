@@ -165,6 +165,98 @@ class BinanceClient:
             klines.append(kline)
             
         return klines
+
+    async def get_klines_multi_timeframe(
+        self,
+        symbol: str,
+        intervals: List[str],
+        limit: int = 500,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None
+    ) -> Dict[str, List[KlineData]]:
+        """
+        Get kline data for multiple timeframes in parallel.
+        
+        Args:
+            symbol: Trading symbol
+            intervals: List of timeframe intervals
+            limit: Number of klines per timeframe
+            start_time: Start time in milliseconds
+            end_time: End time in milliseconds
+            
+        Returns:
+            Dict[str, List[KlineData]]: Dictionary mapping intervals to kline data
+        """
+        import asyncio
+        
+        # Create tasks for parallel execution
+        tasks = []
+        for interval in intervals:
+            task = self.get_klines(
+                symbol=symbol,
+                interval=interval,
+                limit=limit,
+                start_time=start_time,
+                end_time=end_time
+            )
+            tasks.append((interval, task))
+        
+        # Execute all tasks in parallel
+        results = {}
+        for interval, task in tasks:
+            try:
+                klines = await task
+                results[interval] = klines
+            except Exception as e:
+                # Log error but continue with other timeframes
+                print(f"Error fetching {interval} data for {symbol}: {e}")
+                results[interval] = []
+        
+        return results
+
+    async def validate_timeframe(self, interval: str) -> bool:
+        """
+        Validate if a timeframe is supported by the exchange.
+        
+        Args:
+            interval: Timeframe interval to validate
+            
+        Returns:
+            bool: True if timeframe is supported, False otherwise
+        """
+        # Binance supported intervals
+        supported_intervals = [
+            '1m', '3m', '5m', '15m', '30m',
+            '1h', '2h', '4h', '6h', '8h', '12h',
+            '1d', '3d', '1w', '1M'
+        ]
+        
+        return interval in supported_intervals
+
+    async def get_timeframe_limits(self) -> Dict[str, Dict[str, int]]:
+        """
+        Get timeframe-specific limits and constraints.
+        
+        Returns:
+            Dict[str, Dict[str, int]]: Limits for each timeframe
+        """
+        return {
+            '1m': {'max_klines': 1000, 'min_klines': 1},
+            '3m': {'max_klines': 1000, 'min_klines': 1},
+            '5m': {'max_klines': 1000, 'min_klines': 1},
+            '15m': {'max_klines': 1000, 'min_klines': 1},
+            '30m': {'max_klines': 1000, 'min_klines': 1},
+            '1h': {'max_klines': 1000, 'min_klines': 1},
+            '2h': {'max_klines': 1000, 'min_klines': 1},
+            '4h': {'max_klines': 1000, 'min_klines': 1},
+            '6h': {'max_klines': 1000, 'min_klines': 1},
+            '8h': {'max_klines': 1000, 'min_klines': 1},
+            '12h': {'max_klines': 1000, 'min_klines': 1},
+            '1d': {'max_klines': 1000, 'min_klines': 1},
+            '3d': {'max_klines': 1000, 'min_klines': 1},
+            '1w': {'max_klines': 1000, 'min_klines': 1},
+            '1M': {'max_klines': 1000, 'min_klines': 1}
+        }
     
     async def get_recent_trades(self, symbol: str, limit: int = 500) -> List[TradeData]:
         """Get recent trades for a symbol."""
