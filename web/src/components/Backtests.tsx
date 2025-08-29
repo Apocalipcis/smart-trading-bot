@@ -10,9 +10,10 @@ const Backtests: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedBacktest, setSelectedBacktest] = useState<BacktestResult | null>(null);
   const [formData, setFormData] = useState<BacktestConfig>({
-    pair_id: '',
-    strategy: 'smc',
-    timeframe: '1h',
+    pairs: [],
+    strategy: 'SMC',
+    timeframes: [],
+    tf_roles: {},
     start_date: '',
     end_date: '',
     initial_balance: 10000,
@@ -26,6 +27,54 @@ const Backtests: React.FC = () => {
   const [timeframeRoles, setTimeframeRoles] = useState<Record<string, TimeframeRole>>({});
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+
+  // Helper functions to safely extract backtest data
+  const getBacktestPairs = (backtest: BacktestResult): string => {
+    // Try new structure first, then legacy structure
+    const pairs = backtest.pairs || backtest.config?.pairs || backtest.config?.pair_id;
+    if (Array.isArray(pairs)) {
+      return pairs.join(', ');
+    }
+    return pairs || 'N/A';
+  };
+
+  const getBacktestStrategy = (backtest: BacktestResult): string => {
+    // Try new structure first, then legacy structure
+    return backtest.strategy || backtest.config?.strategy || 'N/A';
+  };
+
+  const getBacktestTimeframes = (backtest: BacktestResult): string => {
+    // Try new structure first, then legacy structure
+    const timeframes = backtest.timeframes || backtest.config?.timeframes || backtest.config?.timeframe;
+    if (Array.isArray(timeframes)) {
+      return timeframes.join(', ');
+    }
+    return timeframes || 'N/A';
+  };
+
+  const getBacktestStartDate = (backtest: BacktestResult): string => {
+    return backtest.start_date || backtest.config?.start_date || '';
+  };
+
+  const getBacktestEndDate = (backtest: BacktestResult): string => {
+    return backtest.end_date || backtest.config?.end_date || '';
+  };
+
+  const getBacktestStatus = (backtest: BacktestResult): string => {
+    return backtest.status || 'completed';
+  };
+
+  const getBacktestMetrics = (backtest: BacktestResult) => {
+    // Try new structure first, then legacy structure
+    return backtest.metrics || {
+      total_return: backtest.total_return || 0,
+      win_rate: backtest.win_rate || 0,
+      total_trades: backtest.total_trades || 0,
+      profitable_trades: backtest.profitable_trades || 0,
+      max_drawdown: backtest.max_drawdown || 0,
+      sharpe_ratio: backtest.sharpe_ratio || 0
+    };
+  };
 
   useEffect(() => {
     loadData();
@@ -65,8 +114,10 @@ const Backtests: React.FC = () => {
       return;
     }
     
-    if (Object.keys(timeframeRoles).length !== selectedTimeframes.length) {
-      setValidationErrors(['Please assign roles to all selected timeframes']);
+    // Check if all selected timeframes have roles assigned
+    const missingRoles = selectedTimeframes.filter(tf => !timeframeRoles[tf]);
+    if (missingRoles.length > 0) {
+      setValidationErrors([`Please assign roles to the following timeframes: ${missingRoles.join(', ')}`]);
       return;
     }
     
@@ -76,22 +127,72 @@ const Backtests: React.FC = () => {
       pairs: formData.pairs,
       timeframes: selectedTimeframes,
       tf_roles: timeframeRoles,
+      // Ensure dates are in ISO format
+      start_date: formData.start_date ? new Date(formData.start_date).toISOString() : '',
+      end_date: formData.end_date ? new Date(formData.end_date).toISOString() : '',
+      // Remove any undefined or null values
     };
     
+    // Ensure we have all required fields for new format
+    if (!updatedFormData.pairs || updatedFormData.pairs.length === 0) {
+      setValidationErrors(['Please select at least one trading pair']);
+      return;
+    }
+    
+    if (!updatedFormData.timeframes || updatedFormData.timeframes.length === 0) {
+      setValidationErrors(['Please select at least one timeframe']);
+      return;
+    }
+    
+    if (!updatedFormData.tf_roles || Object.keys(updatedFormData.tf_roles).length === 0) {
+      setValidationErrors(['Please assign roles to all selected timeframes']);
+      return;
+    }
+    
+    // Clean up the data - remove undefined/null values
+    Object.keys(updatedFormData).forEach(key => {
+      if ((updatedFormData as any)[key] === undefined || (updatedFormData as any)[key] === null) {
+        delete (updatedFormData as any)[key];
+      }
+    });
+    
     try {
+      console.log('Creating backtest with data:', JSON.stringify(updatedFormData, null, 2));
       const backtest = await apiClient.createBacktest(updatedFormData);
       setBacktests(prev => [backtest, ...prev]);
       setShowForm(false);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create backtest:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      if (error.response?.data?.detail) {
+        // Handle both string and object detail responses
+        const detail = error.response.data.detail;
+        console.error('Error detail:', detail);
+        if (typeof detail === 'string') {
+          setValidationErrors([detail]);
+        } else if (detail && typeof detail === 'object') {
+          // Handle structured error response
+          const errors = detail.errors || detail.message || [];
+          const errorMessages = Array.isArray(errors) ? errors : [String(errors)];
+          setValidationErrors(errorMessages);
+        } else {
+          setValidationErrors(['Failed to create backtest. Please check your configuration.']);
+        }
+      } else if (error.message) {
+        setValidationErrors([error.message]);
+      } else {
+        setValidationErrors(['Failed to create backtest. Please check your configuration.']);
+      }
     }
   };
 
   const resetForm = () => {
     setFormData({
       pairs: [],
-      strategy: 'smc',
+      strategy: 'SMC',
       timeframes: [],
       tf_roles: {},
       start_date: '',
@@ -109,13 +210,23 @@ const Backtests: React.FC = () => {
   const handleTimeframeChange = (timeframes: string[]) => {
     setSelectedTimeframes(timeframes);
     
-    // Remove roles for removed timeframes
+    // Update roles: remove roles for removed timeframes and add default roles for new timeframes
     const newRoles = { ...timeframeRoles };
+    
+    // Remove roles for timeframes that are no longer selected
     Object.keys(newRoles).forEach(tf => {
       if (!timeframes.includes(tf)) {
         delete newRoles[tf];
       }
     });
+    
+    // Add default role (LTF) for newly selected timeframes that don't have roles
+    timeframes.forEach(tf => {
+      if (!newRoles[tf]) {
+        newRoles[tf] = 'LTF';
+      }
+    });
+    
     setTimeframeRoles(newRoles);
     
     // Clear validation errors
@@ -146,6 +257,13 @@ const Backtests: React.FC = () => {
   const validateConfiguration = async () => {
     if (selectedTimeframes.length === 0) return;
     
+    // Check for missing roles first
+    const missingRoles = selectedTimeframes.filter(tf => !timeframeRoles[tf]);
+    if (missingRoles.length > 0) {
+      setValidationErrors([`Please assign roles to the following timeframes: ${missingRoles.join(', ')}`]);
+      return;
+    }
+    
     try {
       const validation = await apiClient.validateTimeframeRoles(selectedTimeframes, timeframeRoles);
       
@@ -153,17 +271,38 @@ const Backtests: React.FC = () => {
         setValidationErrors([]);
         setValidationWarnings(validation.data?.warnings || []);
       } else {
-        setValidationErrors(validation.data?.errors || []);
-        setValidationWarnings(validation.data?.warnings || []);
+        const errors = validation.data?.errors || [];
+        const warnings = validation.data?.warnings || [];
+        setValidationErrors(Array.isArray(errors) ? errors : [String(errors)]);
+        setValidationWarnings(Array.isArray(warnings) ? warnings : [String(warnings)]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Validation failed:', error);
+      if (error.response?.status === 404) {
+        // Validation endpoint not found, skip validation
+        console.warn('Validation endpoint not available, skipping validation');
+        setValidationErrors([]);
+        setValidationWarnings([]);
+      } else {
+        setValidationErrors(['Validation failed. Please check your configuration.']);
+      }
     }
   };
 
   useEffect(() => {
-    if (selectedTimeframes.length > 0 && Object.keys(timeframeRoles).length === selectedTimeframes.length) {
+    if (selectedTimeframes.length > 0 && selectedTimeframes.every(tf => timeframeRoles[tf])) {
       validateConfiguration();
+    } else if (selectedTimeframes.length > 0) {
+      // Show real-time validation for missing roles
+      const missingRoles = selectedTimeframes.filter(tf => !timeframeRoles[tf]);
+      if (missingRoles.length > 0) {
+        setValidationErrors([`Please assign roles to the following timeframes: ${missingRoles.join(', ')}`]);
+      } else {
+        setValidationErrors([]);
+      }
+    } else {
+      setValidationErrors([]);
+      setValidationWarnings([]);
     }
   }, [selectedTimeframes, timeframeRoles]);
 
@@ -192,12 +331,17 @@ const Backtests: React.FC = () => {
   };
 
   const formatDuration = (startDate: string, endDate?: string) => {
-    const start = new Date(startDate);
-    const end = endDate ? new Date(endDate) : new Date();
-    const diff = end.getTime() - start.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    return `${days}d ${hours}h`;
+    if (!startDate) return 'N/A';
+    try {
+      const start = new Date(startDate);
+      const end = endDate ? new Date(endDate) : new Date();
+      const diff = end.getTime() - start.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      return `${days}d ${hours}h`;
+    } catch (error) {
+      return 'N/A';
+    }
   };
 
   if (loading) {
@@ -269,35 +413,37 @@ const Backtests: React.FC = () => {
               {backtests.map((backtest) => (
                 <tr key={backtest.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {backtest.config.pairs?.join(', ') || backtest.config.pair_id || 'N/A'}
+                    {getBacktestPairs(backtest)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {strategies.find(s => s.name.toLowerCase() === backtest.config.strategy)?.name || backtest.config.strategy}
+                    {strategies.find(s => s.name === getBacktestStrategy(backtest))?.name || getBacktestStrategy(backtest)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {backtest.config.timeframes?.join(', ') || backtest.config.timeframe || 'N/A'}
+                    {getBacktestTimeframes(backtest)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {formatDuration(backtest.config.start_date, backtest.config.end_date)}
+                    {formatDuration(getBacktestStartDate(backtest), getBacktestEndDate(backtest))}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      backtest.status === 'completed' 
+                      getBacktestStatus(backtest) === 'completed' 
                         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : backtest.status === 'running'
+                        : getBacktestStatus(backtest) === 'running'
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     }`}>
-                      {backtest.status}
+                      {getBacktestStatus(backtest)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {backtest.metrics ? (
-                      <span className={backtest.metrics.total_return >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {backtest.metrics.total_return >= 0 ? '+' : ''}{backtest.metrics.total_return.toFixed(2)}%
+                    {getBacktestMetrics(backtest).total_return >= 0 ? (
+                      <span className="text-green-600">
+                        {getBacktestMetrics(backtest).total_return >= 0 ? '+' : ''}{getBacktestMetrics(backtest).total_return.toFixed(2)}%
                       </span>
                     ) : (
-                      '-'
+                      <span className="text-red-600">
+                        {getBacktestMetrics(backtest).total_return.toFixed(2)}%
+                      </span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
@@ -374,7 +520,7 @@ const Backtests: React.FC = () => {
                   >
                     <option value="">Select a strategy</option>
                     {strategies.map((strategy) => (
-                      <option key={strategy.name.toLowerCase()} value={strategy.name.toLowerCase()}>
+                      <option key={strategy.name} value={strategy.name}>
                         {strategy.name} - {strategy.description}
                       </option>
                     ))}
@@ -396,11 +542,17 @@ const Backtests: React.FC = () => {
                     className="input-field min-h-[80px]"
                     required
                   >
-                    {availableTimeframes?.timeframes.map((tf) => (
-                      <option key={tf} value={tf}>
-                        {tf}
-                      </option>
-                    )) || []}
+                    {loading ? (
+                      <option disabled>Loading timeframes...</option>
+                    ) : availableTimeframes?.timeframes && availableTimeframes.timeframes.length > 0 ? (
+                      availableTimeframes.timeframes.map((tf) => (
+                        <option key={tf.timeframe} value={tf.timeframe}>
+                          {tf.timeframe} - {tf.description}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>No timeframes available</option>
+                    )}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple timeframes</p>
                 </div>
@@ -413,7 +565,11 @@ const Backtests: React.FC = () => {
                     </label>
                     <div className="space-y-2">
                       {selectedTimeframes.map((timeframe) => (
-                        <div key={timeframe} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div key={timeframe} className={`flex items-center space-x-3 p-3 rounded-lg ${
+                          !timeframeRoles[timeframe] 
+                            ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' 
+                            : 'bg-gray-50 dark:bg-gray-700'
+                        }`}>
                           <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[40px]">
                             {timeframe}
                           </span>
@@ -426,6 +582,12 @@ const Backtests: React.FC = () => {
                             <option value="LTF">LTF</option>
                             <option value="HTF">HTF</option>
                           </select>
+                          {!timeframeRoles[timeframe] && (
+                            <span className="text-xs text-red-600 dark:text-red-400 flex items-center">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Role required
+                            </span>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeTimeframe(timeframe)}
@@ -444,9 +606,9 @@ const Backtests: React.FC = () => {
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                     <div className="text-sm text-red-800 dark:text-red-200">
                       {validationErrors.map((error, index) => (
-                        <div key={index} className="flex items-center">
-                          <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-                          {error}
+                        <div key={index} className="flex items-start">
+                          <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
+                          <span>{error}</span>
                         </div>
                       ))}
                     </div>
@@ -588,67 +750,67 @@ const Backtests: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">Pairs:</span>
-                      <span className="ml-2 font-medium">{selectedBacktest.config.pairs?.join(', ') || selectedBacktest.config.pair_id || 'N/A'}</span>
+                      <span className="ml-2 font-medium">{getBacktestPairs(selectedBacktest)}</span>
                     </div>
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">Strategy:</span>
-                      <span className="ml-2 font-medium">{selectedBacktest.config.strategy}</span>
+                      <span className="ml-2 font-medium">{getBacktestStrategy(selectedBacktest)}</span>
                     </div>
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">Timeframes:</span>
-                      <span className="ml-2 font-medium">{selectedBacktest.config.timeframes?.join(', ') || selectedBacktest.config.timeframe || 'N/A'}</span>
+                      <span className="ml-2 font-medium">{getBacktestTimeframes(selectedBacktest)}</span>
                     </div>
-                    {selectedBacktest.config.tf_roles && Object.keys(selectedBacktest.config.tf_roles).length > 0 && (
+                    {(selectedBacktest.config?.tf_roles || selectedBacktest.tf_roles) && Object.keys(selectedBacktest.config?.tf_roles || selectedBacktest.tf_roles || {}).length > 0 && (
                       <div>
                         <span className="text-gray-500 dark:text-gray-400">Roles:</span>
                         <span className="ml-2 font-medium">
-                          {Object.entries(selectedBacktest.config.tf_roles).map(([tf, role]) => `${tf}:${role}`).join(', ')}
+                          {Object.entries(selectedBacktest.config?.tf_roles || selectedBacktest.tf_roles || {}).map(([tf, role]) => `${tf}: ${role}`).join(', ')}
                         </span>
                       </div>
                     )}
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">Period:</span>
                       <span className="ml-2 font-medium">
-                        {formatDuration(selectedBacktest.config.start_date, selectedBacktest.config.end_date)}
+                        {formatDuration(getBacktestStartDate(selectedBacktest), getBacktestEndDate(selectedBacktest))}
                       </span>
                     </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Initial Balance:</span>
-                      <span className="ml-2 font-medium">${(selectedBacktest.config.initial_balance || selectedBacktest.config.initial_capital || 0).toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Risk per Trade:</span>
-                      <span className="ml-2 font-medium">{selectedBacktest.config.risk_per_trade}%</span>
-                    </div>
+                                          <div>
+                        <span className="text-gray-500 dark:text-gray-400">Initial Balance:</span>
+                        <span className="ml-2 font-medium">${(selectedBacktest.config?.initial_balance || selectedBacktest.initial_balance || 0).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Risk per Trade:</span>
+                        <span className="ml-2 font-medium">{selectedBacktest.config?.risk_per_trade || 2}%</span>
+                      </div>
                   </div>
                 </div>
 
                 {/* Metrics */}
-                {selectedBacktest.metrics && (
+                {getBacktestMetrics(selectedBacktest) && (
                   <div>
                     <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">Performance Metrics</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {selectedBacktest.metrics.total_return >= 0 ? '+' : ''}{selectedBacktest.metrics.total_return.toFixed(2)}%
+                          {getBacktestMetrics(selectedBacktest).total_return >= 0 ? '+' : ''}{getBacktestMetrics(selectedBacktest).total_return.toFixed(2)}%
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">Total Return</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {selectedBacktest.metrics.win_rate.toFixed(1)}%
+                          {getBacktestMetrics(selectedBacktest).win_rate.toFixed(1)}%
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">Win Rate</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {selectedBacktest.metrics.total_trades}
+                          {getBacktestMetrics(selectedBacktest).total_trades}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">Total Trades</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {selectedBacktest.metrics.max_drawdown.toFixed(2)}%
+                          {getBacktestMetrics(selectedBacktest).max_drawdown.toFixed(2)}%
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">Max Drawdown</div>
                       </div>
