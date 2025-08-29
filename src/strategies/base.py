@@ -57,6 +57,19 @@ class BaseStrategy(bt.Strategy):
         ('max_positions', 5),      # Maximum concurrent positions
     )
     
+    # Default role requirements (can be overridden by subclasses)
+    required_roles = ['LTF']  # Default to single timeframe
+    
+    # Default role constraints (can be overridden by subclasses)
+    role_constraints = [
+        {
+            'role': 'LTF',
+            'min_timeframe': '1m',
+            'max_timeframe': '1h',
+            'description': 'Lower timeframe for entry/exit timing'
+        }
+    ]
+    
     def __init__(self):
         """Initialize the strategy."""
         super().__init__()
@@ -261,3 +274,93 @@ class BaseStrategy(bt.Strategy):
         print(f"  Total trades: {stats['total_trades']}")
         print(f"  Total PnL: ${stats['total_pnl']:.2f}")
         print(f"  Win rate: {stats['winning_trades']}/{stats['total_trades']}")
+
+    # Multi-timeframe support methods
+    
+    def get_data_by_role(self, role: str) -> Optional[bt.feeds.PandasData]:
+        """
+        Get data feed by role (HTF/LTF).
+        
+        Args:
+            role: The role to get data for ('HTF' or 'LTF')
+            
+        Returns:
+            Optional[bt.feeds.PandasData]: Data feed for the role, or None if not found
+        """
+        # In a multi-timeframe setup, data feeds would be organized by role
+        # This is a placeholder implementation
+        if hasattr(self, f'data_{role.lower()}'):
+            return getattr(self, f'data_{role.lower()}')
+        elif hasattr(self, 'datas') and len(self.datas) > 0:
+            # Fallback to first data feed
+            return self.datas[0]
+        return None
+    
+    def get_htf_data(self) -> Optional[bt.feeds.PandasData]:
+        """Get higher timeframe data."""
+        return self.get_data_by_role('HTF')
+    
+    def get_ltf_data(self) -> Optional[bt.feeds.PandasData]:
+        """Get lower timeframe data."""
+        return self.get_data_by_role('LTF')
+    
+    def get_current_price(self, role: str = 'LTF') -> Optional[float]:
+        """
+        Get current price for a specific role.
+        
+        Args:
+            role: The role to get price for ('HTF' or 'LTF')
+            
+        Returns:
+            Optional[float]: Current price, or None if not available
+        """
+        data = self.get_data_by_role(role)
+        if data and len(data) > 0:
+            return data.close[0]
+        return None
+    
+    def get_htf_price(self) -> Optional[float]:
+        """Get current higher timeframe price."""
+        return self.get_current_price('HTF')
+    
+    def get_ltf_price(self) -> Optional[float]:
+        """Get current lower timeframe price."""
+        return self.get_current_price('LTF')
+    
+    def is_htf_bar_complete(self) -> bool:
+        """Check if the higher timeframe bar is complete."""
+        htf_data = self.get_htf_data()
+        if htf_data and len(htf_data) > 0:
+            # Check if this is a new HTF bar
+            return htf_data.datetime.date(0) != htf_data.datetime.date(-1)
+        return False
+    
+    def get_timeframe_ratio(self) -> Optional[int]:
+        """
+        Get the ratio between HTF and LTF timeframes.
+        
+        Returns:
+            Optional[int]: Ratio (e.g., 4 for 1h/15m), or None if not available
+        """
+        htf_data = self.get_htf_data()
+        ltf_data = self.get_ltf_data()
+        
+        if htf_data and ltf_data:
+            # This would need to be implemented based on actual timeframe data
+            # For now, return None as placeholder
+            return None
+        
+        return None
+    
+    def validate_multi_timeframe_setup(self) -> bool:
+        """
+        Validate that the strategy has proper multi-timeframe setup.
+        
+        Returns:
+            bool: True if setup is valid, False otherwise
+        """
+        if 'HTF' in self.required_roles and not self.get_htf_data():
+            return False
+        if 'LTF' in self.required_roles and not self.get_ltf_data():
+            return False
+        return True
