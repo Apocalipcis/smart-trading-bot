@@ -9,7 +9,10 @@ import {
   Moon, 
   Sun,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Square,
+  MessageCircle,
+  RotateCcw
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -51,12 +54,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <TrendingUp className="w-8 h-8 text-primary-600" />
-            <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
-              Trading Bot
-            </span>
-          </div>
+                      <div className="flex items-center">
+              <TrendingUp className="w-8 h-8 text-primary-600" />
+              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
+                SMC Trading Bot - Control Panel
+              </span>
+            </div>
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -106,11 +109,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* System Status */}
-              <div className="flex items-center px-3 py-1 bg-green-50 dark:bg-green-900/20 rounded-full">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-xs font-medium text-green-700 dark:text-green-300">Online</span>
-              </div>
+              {/* Global Action Buttons */}
+              <button className="flex items-center px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors">
+                <Square className="w-4 h-4 mr-2" />
+                Stop Bot
+              </button>
+              
+              <button className="flex items-center px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md text-sm font-medium transition-colors">
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Telegram ON
+              </button>
+              
+              <button className="flex items-center px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-medium transition-colors">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reload Config
+              </button>
 
               {/* Dark mode toggle */}
               <button
@@ -118,12 +131,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className="p-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-
-              {/* Notifications */}
-              <button className="p-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 relative">
-                <AlertCircle className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
             </div>
           </div>

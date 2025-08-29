@@ -13,12 +13,14 @@ from .middleware import (
 )
 from .routers import (
     backtests,
+    markets,
     notifications,
     orders,
     pairs,
     settings,
     signals,
     status,
+    strategies,
     simulation
 )
 from ..startup import create_startup_event_handler, create_shutdown_event_handler
@@ -100,6 +102,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(pairs.router, prefix="/api/v1")
 app.include_router(signals.router, prefix="/api/v1")
 app.include_router(backtests.router, prefix="/api/v1")
+app.include_router(markets.router, prefix="/api/v1")
+app.include_router(strategies.router, prefix="/api/v1")
 app.include_router(orders.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(status.router, prefix="/api/v1")
@@ -127,6 +131,8 @@ async def api_root():
             "pairs": "/api/v1/pairs",
             "signals": "/api/v1/signals",
             "backtests": "/api/v1/backtests",
+            "markets": "/api/v1/markets",
+            "strategies": "/api/v1/strategies",
             "orders": "/api/v1/orders",
             "settings": "/api/v1/settings",
             "status": "/api/v1/status",
