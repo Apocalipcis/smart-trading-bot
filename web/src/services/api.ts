@@ -35,7 +35,7 @@ class ApiClient {
     
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
+      timeout: 30000, // Increased from 10000 to 30000ms
       headers: {
         'Content-Type': 'application/json',
       },
@@ -53,12 +53,28 @@ class ApiClient {
       }
     );
 
-    // Add response interceptor for error handling
+    // Add response interceptor for error handling with retry logic
     this.client.interceptors.response.use(
       (response) => {
         return response;
       },
-      (error) => {
+      async (error) => {
+        // Retry logic for network errors
+        if (error.code === 'ECONNABORTED' || error.code === 'ECONNRESET' || !error.response) {
+          const config = error.config;
+          config.retryCount = config.retryCount || 0;
+          
+          if (config.retryCount < 3) {
+            config.retryCount += 1;
+            const delay = Math.pow(2, config.retryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
+            
+            console.log(`Retrying request (${config.retryCount}/3) after ${delay}ms: ${config.method?.toUpperCase()} ${config.url}`);
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return this.client.request(config);
+          }
+        }
+        
         if (error.response?.status === 403) {
           console.warn('API access forbidden - trading may be disabled:', error.response?.data?.detail || error.message);
         } else {
@@ -71,13 +87,22 @@ class ApiClient {
 
   // Trading Pairs
   async getPairs(): Promise<TradingPair[]> {
-    const response = await this.client.get<ApiResponse<TradingPair[]>>('/api/v1/pairs');
-    return response.data.data;
+    const response = await this.client.get<any>('/api/v1/pairs');
+    console.log('API Response for pairs:', response.data);
+    // Backend returns PaginatedResponse, not ApiResponse
+    const items = response.data.items || [];
+    console.log('Items from API:', items);
+    // Filter out any null or undefined items
+    const filteredItems = items.filter((item: any) => item != null);
+    console.log('Filtered items:', filteredItems);
+    return filteredItems;
   }
 
   async createPair(pair: CreatePairRequest): Promise<TradingPair> {
-    const response = await this.client.post<ApiResponse<TradingPair>>('/api/v1/pairs', pair);
-    return response.data.data;
+    const response = await this.client.post<TradingPair>('/api/v1/pairs', pair);
+    console.log('Create pair response:', response.data);
+    // Backend returns TradingPair directly, not wrapped in ApiResponse
+    return response.data;
   }
 
   async deletePair(pairId: string): Promise<void> {
@@ -87,8 +112,9 @@ class ApiClient {
   // Signals
   async getSignals(limit?: number): Promise<Signal[]> {
     const params = limit ? { limit } : {};
-    const response = await this.client.get<ApiResponse<Signal[]>>('/api/v1/signals', { params });
-    return response.data.data;
+    const response = await this.client.get<any>('/api/v1/signals', { params });
+    // Backend returns PaginatedResponse, not ApiResponse
+    return response.data.items || [];
   }
 
   // Backtests
@@ -120,8 +146,8 @@ class ApiClient {
 
   // Markets
   async getAvailableTimeframes(): Promise<AvailableTimeframes> {
-    const response = await this.client.get<ApiResponse<AvailableTimeframes>>('/api/v1/markets/timeframes');
-    return response.data.data;
+    const response = await this.client.get<AvailableTimeframes>('/api/v1/markets/timeframes');
+    return response.data;
   }
 
   async getTimeframeRoleConstraints(): Promise<TimeframeConstraint[]> {
@@ -135,18 +161,19 @@ class ApiClient {
   }
 
   async validateTimeframeRoles(timeframes: string[], tfRoles: Record<string, TimeframeRole>): Promise<any> {
-    const params = {
-      timeframes: timeframes.join(','),
-      tf_roles: JSON.stringify(tfRoles)
+    const payload = {
+      timeframes: timeframes,
+      tf_roles: tfRoles
     };
-    const response = await this.client.get<ApiResponse<any>>('/api/v1/markets/timeframes/validate', { params });
+    const response = await this.client.post<ApiResponse<any>>('/api/v1/markets/timeframes/validate', payload);
     return response.data.data;
   }
 
   // Strategies
   async getStrategies(): Promise<StrategyMetadata[]> {
-    const response = await this.client.get<ApiResponse<StrategyMetadata[]>>('/api/v1/strategies');
-    return response.data.data;
+    const response = await this.client.get<StrategyMetadata[]>('/api/v1/strategies');
+    // Backend returns List[StrategyInfo] directly, not wrapped in ApiResponse
+    return response.data;
   }
 
   async getStrategy(strategyName: string): Promise<StrategyMetadata> {
@@ -159,11 +186,11 @@ class ApiClient {
     timeframes: string[], 
     tfRoles: Record<string, TimeframeRole>
   ): Promise<any> {
-    const params = {
-      timeframes: timeframes.join(','),
-      tf_roles: JSON.stringify(tfRoles)
+    const payload = {
+      timeframes: timeframes,
+      tf_roles: tfRoles
     };
-    const response = await this.client.get<ApiResponse<any>>(`/api/v1/strategies/${strategyName}/validate`, { params });
+    const response = await this.client.post<ApiResponse<any>>(`/api/v1/strategies/${strategyName}/validate`, payload);
     return response.data.data;
   }
 
@@ -185,12 +212,17 @@ class ApiClient {
 
   // Settings
   async getSettings(): Promise<Settings> {
-    const response = await this.client.get<ApiResponse<Settings>>('/api/v1/settings');
-    return response.data.data;
+    console.log('🌐 API: Getting settings...');
+    const response = await this.client.get<Settings>('/api/v1/settings');
+    console.log('🌐 API: Settings response:', response.data);
+    // Backend returns Settings directly, not wrapped in ApiResponse
+    return response.data;
   }
 
   async updateSettings(settings: Partial<Settings>): Promise<Settings> {
+    console.log('🌐 API: Updating settings:', settings);
     const response = await this.client.put<ApiResponse<Settings>>('/api/v1/settings', settings);
+    console.log('🌐 API: Update settings response:', response.data);
     return response.data.data;
   }
 

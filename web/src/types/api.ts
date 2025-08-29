@@ -11,15 +11,15 @@ export interface TradingPair {
   symbol: string;
   base_asset: string;
   quote_asset: string;
-  status: 'active' | 'inactive';
+  strategy: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreatePairRequest {
   symbol: string;
-  base_asset: string;
-  quote_asset: string;
+  strategy: string;
 }
 
 // Signal types

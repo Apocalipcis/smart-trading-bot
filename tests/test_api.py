@@ -53,6 +53,7 @@ def test_create_pair():
         "symbol": "BTCUSDT",
         "base_asset": "BTC",
         "quote_asset": "USDT",
+        "strategy": "SMC",
         "is_active": True
     }
     response = client.post("/api/v1/pairs", json=pair_data)
@@ -60,6 +61,7 @@ def test_create_pair():
     data = response.json()
     assert data["symbol"] == "BTCUSDT"
     assert data["base_asset"] == "BTC"
+    assert data["strategy"] == "SMC"
 
 
 def test_get_signals():

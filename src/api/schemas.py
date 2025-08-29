@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from uuid import UUID
+from uuid import UUID, uuid4
 import re
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -12,9 +12,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class TradingPair(BaseModel):
     """Trading pair model."""
+    id: UUID = Field(default_factory=uuid4, description="Unique trading pair ID")
     symbol: str = Field(..., description="Trading pair symbol (e.g., BTCUSDT)")
-    base_asset: str = Field(..., description="Base asset (e.g., BTC)")
-    quote_asset: str = Field(..., description="Quote asset (e.g., USDT)")
+    base_asset: Optional[str] = Field(None, description="Base asset (e.g., BTC)")
+    quote_asset: Optional[str] = Field(None, description="Quote asset (e.g., USDT)")
+    strategy: str = Field(..., description="Strategy name (e.g., SMC)")
     is_active: bool = Field(default=True, description="Whether the pair is active")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

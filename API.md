@@ -109,23 +109,20 @@ Get list of available trading pairs.
 }
 ```
 
-##### GET `/pairs/{symbol}`
+##### GET `/pairs/{pair_id}`
 Get specific trading pair information.
 
 **Response**:
 ```json
 {
+  "id": "123e4567-e89b-12d3-a456-426614174000",
   "symbol": "BTCUSDT",
   "base_asset": "BTC",
   "quote_asset": "USDT",
-  "status": "TRADING",
-  "price_precision": 2,
-  "quantity_precision": 3,
-  "min_notional": 5.0,
-  "tick_size": 0.01,
-  "step_size": 0.001,
-  "current_price": 45000.50,
-  "24h_volume": 1250000.75
+  "strategy": "SMC",
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
 }
 ```
 
@@ -137,11 +134,26 @@ Add a new trading pair to the system.
 {
   "symbol": "ETHUSDT",
   "base_asset": "ETH",
-  "quote_asset": "USDT"
+  "quote_asset": "USDT",
+  "strategy": "SMC"
 }
 ```
 
-##### DELETE `/pairs/{symbol}`
+##### PUT `/pairs/{pair_id}`
+Update an existing trading pair.
+
+**Request Body**:
+```json
+{
+  "symbol": "ETHUSDT",
+  "base_asset": "ETH",
+  "quote_asset": "USDT",
+  "strategy": "SMC",
+  "is_active": true
+}
+```
+
+##### DELETE `/pairs/{pair_id}`
 Remove a trading pair from the system.
 
 #### Trading Signals
