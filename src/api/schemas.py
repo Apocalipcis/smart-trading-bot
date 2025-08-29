@@ -101,6 +101,17 @@ class StrategyMetadata(BaseModel):
         return v
 
 
+class PairValidationRequest(BaseModel):
+    """Request model for pair validation."""
+    symbol: str = Field(..., description="Trading pair symbol to validate")
+
+
+class PairValidationResponse(BaseModel):
+    """Response model for pair validation."""
+    is_valid: bool = Field(..., description="Whether the pair is valid on Binance")
+    symbol: str = Field(..., description="The validated symbol")
+
+
 class BacktestRequest(BaseModel):
     """Backtest request model with support for multiple timeframes and roles."""
     pairs: Optional[List[str]] = Field(None, description="Trading pairs")
