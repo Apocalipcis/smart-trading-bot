@@ -23,7 +23,7 @@ from .routers import (
     strategies,
     simulation
 )
-from ..startup import create_startup_event_handler, create_shutdown_event_handler
+from src.startup import create_startup_event_handler, create_shutdown_event_handler
 
 
 @asynccontextmanager

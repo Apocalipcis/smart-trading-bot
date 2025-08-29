@@ -24,9 +24,15 @@ class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // In Docker, the API is served through nginx proxy at the same domain
-    // Use relative URL when no explicit API URL is provided
+    // In development, use relative URLs to work with Vite proxy
+    // In production, use the configured API URL or relative URLs for Docker
     this.baseURL = import.meta.env.VITE_API_URL || '';
+    
+    // For development with proxy, use relative URLs
+    if (import.meta.env.DEV && !this.baseURL) {
+      this.baseURL = '';
+    }
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 10000,
@@ -53,7 +59,11 @@ class ApiClient {
         return response;
       },
       (error) => {
-        console.error('API Response Error:', error.response?.data || error.message);
+        if (error.response?.status === 403) {
+          console.warn('API access forbidden - trading may be disabled:', error.response?.data?.detail || error.message);
+        } else {
+          console.error('API Response Error:', error.response?.data || error.message);
+        }
         return Promise.reject(error);
       }
     );
@@ -83,18 +93,21 @@ class ApiClient {
 
   // Backtests
   async getBacktests(): Promise<BacktestResult[]> {
-    const response = await this.client.get<ApiResponse<BacktestResult[]>>('/api/v1/backtests');
-    return response.data.data;
+    const response = await this.client.get<any>('/api/v1/backtests');
+    // Backend returns PaginatedResponse, not ApiResponse
+    return response.data.items || [];
   }
 
   async createBacktest(config: BacktestConfig): Promise<BacktestResult> {
-    const response = await this.client.post<ApiResponse<BacktestResult>>('/api/v1/backtests', config);
-    return response.data.data;
+    const response = await this.client.post<any>('/api/v1/backtests', config);
+    // Backend returns BacktestResult directly, not wrapped in ApiResponse
+    return response.data;
   }
 
   async getBacktest(backtestId: string): Promise<BacktestResult> {
-    const response = await this.client.get<ApiResponse<BacktestResult>>(`/api/v1/backtests/${backtestId}`);
-    return response.data.data;
+    const response = await this.client.get<any>(`/api/v1/backtests/${backtestId}`);
+    // Backend returns BacktestResult directly, not wrapped in ApiResponse
+    return response.data;
   }
 
   async deleteBacktest(backtestId: string): Promise<void> {

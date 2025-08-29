@@ -23,7 +23,8 @@ FROM python:3.11-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH="/app/src"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -34,6 +35,9 @@ RUN apt-get update && apt-get install -y \
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Set working directory
+WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY pyproject.toml README.md ./

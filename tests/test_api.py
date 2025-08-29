@@ -90,7 +90,7 @@ def test_get_settings():
 
 
 def test_orders_requires_trading_enabled():
-    """Test that orders endpoint requires trading to be enabled."""
+    """Test that orders endpoint requires trading to be enabled (when not in simulation mode)."""
     response = client.get("/api/v1/orders")
     assert response.status_code == 403
     data = response.json()

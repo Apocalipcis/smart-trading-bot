@@ -2,10 +2,11 @@
 
 from typing import List, Optional
 from uuid import uuid4
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from ..dependencies import require_trading_enabled, require_read_access
+from ..dependencies import require_trading_enabled, require_read_access, require_simulation_or_trading_enabled
 from ..schemas import APIResponse, Order, OrderRequest, PaginatedResponse
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -50,6 +51,35 @@ async def get_orders(
         size=size,
         pages=pages
     )
+
+
+@router.get("/pending")
+async def get_pending_orders(
+    simulation_or_trading_enabled: bool = Depends(require_simulation_or_trading_enabled)
+):
+    """Get pending orders (alias for pending/confirmation)."""
+    # Return orders with "pending" status
+    pending_orders = [o for o in _orders if o.status == "pending"]
+    
+    # Transform to match frontend expectations
+    transformed_orders = []
+    for order in pending_orders:
+        # Extract metadata for pending confirmation structure
+        metadata = order.metadata or {}
+        transformed_orders.append({
+            "id": str(order.id),
+            "signal_id": getattr(order, 'signal_id', ''),
+            "pair_id": order.pair,
+            "side": order.side.value,
+            "quantity": order.quantity,
+            "price": order.price,
+            "stop_loss": metadata.get('stop_loss', 0),
+            "take_profit": metadata.get('take_profit', 0),
+            "created_at": order.created_at.isoformat(),
+            "expires_at": (order.created_at + timedelta(minutes=5)).isoformat()  # 5 minute TTL
+        })
+    
+    return transformed_orders
 
 
 @router.get("/{order_id}", response_model=Order)
@@ -113,12 +143,18 @@ async def cancel_order(
     order_id: str,
     trading_enabled: bool = Depends(require_trading_enabled)
 ) -> APIResponse:
-    """Cancel an existing order."""
-    for i, order in enumerate(_orders):
+    """Cancel an order."""
+    for order in _orders:
         if str(order.id) == order_id:
-            # Update order status
+            if order.status == "cancelled":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Order {order_id} is already cancelled"
+                )
+            
+            # TODO: This would cancel the order on the exchange
+            # For now, just update the status
             order.status = "cancelled"
-            order.updated_at = order.updated_at  # This would be updated in real implementation
             
             return APIResponse(
                 success=True,
@@ -136,10 +172,10 @@ async def delete_order(
     order_id: str,
     trading_enabled: bool = Depends(require_trading_enabled)
 ) -> APIResponse:
-    """Delete an order from the system."""
+    """Delete an order."""
     for i, order in enumerate(_orders):
         if str(order.id) == order_id:
-            del _orders[i]
+            _orders.pop(i)
             return APIResponse(
                 success=True,
                 message=f"Order {order_id} deleted successfully"
@@ -149,21 +185,6 @@ async def delete_order(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Order {order_id} not found"
     )
-
-
-@router.get("/pending")
-async def get_pending_orders(
-    read_access: bool = Depends(require_read_access)
-):
-    """Get pending orders (alias for pending/confirmation)."""
-    # Return orders with "pending" status
-    pending_orders = [o for o in _orders if o.status == "pending"]
-    
-    return {
-        "pending_orders": pending_orders,
-        "count": len(pending_orders)
-    }
-
 
 
 @router.get("/pending/confirmation")
@@ -202,6 +223,63 @@ async def confirm_order(
             return APIResponse(
                 success=True,
                 message=f"Order {order_id} confirmed and submitted to exchange"
+            )
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Order {order_id} not found"
+    )
+
+
+@router.post("/pending/{order_id}/confirm")
+async def confirm_pending_order(
+    order_id: str,
+    trading_enabled: bool = Depends(require_trading_enabled)
+) -> APIResponse:
+    """Confirm a pending order (frontend endpoint)."""
+    for order in _orders:
+        if str(order.id) == order_id:
+            if order.status != "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Order {order_id} is not pending confirmation"
+                )
+            
+            # TODO: This would submit the order to the exchange
+            # For now, just update the status
+            order.status = "confirmed"
+            
+            return APIResponse(
+                success=True,
+                message=f"Order {order_id} confirmed and submitted to exchange"
+            )
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Order {order_id} not found"
+    )
+
+
+@router.post("/pending/{order_id}/reject")
+async def reject_pending_order(
+    order_id: str,
+    trading_enabled: bool = Depends(require_trading_enabled)
+) -> APIResponse:
+    """Reject a pending order."""
+    for order in _orders:
+        if str(order.id) == order_id:
+            if order.status != "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Order {order_id} is not pending confirmation"
+                )
+            
+            # Update the status to rejected
+            order.status = "rejected"
+            
+            return APIResponse(
+                success=True,
+                message=f"Order {order_id} rejected"
             )
     
     raise HTTPException(

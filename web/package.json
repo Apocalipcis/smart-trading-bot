@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:host": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:api": "curl -s http://localhost:8000/api/v1/status/health | jq .",
+    "check-backend": "curl -s http://localhost:8000/api/v1/status/health > /dev/null && echo 'Backend is running' || echo 'Backend is not running'"
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.7",

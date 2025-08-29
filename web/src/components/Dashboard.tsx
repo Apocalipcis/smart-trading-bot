@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Play, Pause, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { TradingPair, Signal, Settings, PendingConfirmation } from '../types/api';
 import apiClient from '../services/api';
+import ApiTest from './ApiTest';
 
 const Dashboard: React.FC = () => {
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [pendingConfirmations, setPendingConfirmations] = useState<PendingConfirmation[]>([]);
+  const [pendingConfirmations, setPendingConfirmations] = useState<PendingConfirmation[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [newPair, setNewPair] = useState({ symbol: '', base_asset: '', quote_asset: '' });
   const [showAddPair, setShowAddPair] = useState(false);
@@ -19,17 +20,24 @@ const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [pairsData, signalsData, settingsData, pendingData] = await Promise.all([
+      const [pairsData, signalsData, settingsData] = await Promise.all([
         apiClient.getPairs(),
         apiClient.getSignals(10),
         apiClient.getSettings(),
-        apiClient.getPendingConfirmations(),
       ]);
       
       setPairs(pairsData);
       setSignals(signalsData);
       setSettings(settingsData);
-      setPendingConfirmations(pendingData);
+      
+             // Try to load pending confirmations separately to handle potential 403 errors
+       try {
+         const pendingData = await apiClient.getPendingConfirmations();
+         setPendingConfirmations(pendingData || []);
+       } catch (pendingError) {
+         console.warn('Could not load pending confirmations (trading may be disabled):', pendingError);
+         setPendingConfirmations([]);
+       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -41,8 +49,12 @@ const Dashboard: React.FC = () => {
     const eventSource = apiClient.getSignalsStream();
     
     eventSource.onmessage = (event) => {
-      const signal: Signal = JSON.parse(event.data);
-      setSignals(prev => [signal, ...prev.slice(0, 9)]);
+      try {
+        const signal: Signal = JSON.parse(event.data);
+        setSignals(prev => [signal, ...(prev || []).slice(0, 9)]);
+      } catch (error) {
+        console.error('Failed to parse signal data:', error);
+      }
     };
 
     eventSource.onerror = (error) => {
@@ -78,7 +90,10 @@ const Dashboard: React.FC = () => {
   const handleConfirmOrder = async (confirmationId: string) => {
     try {
       await apiClient.confirmOrder(confirmationId);
-      setPendingConfirmations(prev => prev.filter(p => p.id !== confirmationId));
+      setPendingConfirmations(prev => {
+        if (!prev) return [];
+        return prev.filter(p => p.id !== confirmationId);
+      });
     } catch (error) {
       console.error('Failed to confirm order:', error);
     }
@@ -87,7 +102,10 @@ const Dashboard: React.FC = () => {
   const handleRejectOrder = async (confirmationId: string) => {
     try {
       await apiClient.rejectOrder(confirmationId);
-      setPendingConfirmations(prev => prev.filter(p => p.id !== confirmationId));
+      setPendingConfirmations(prev => {
+        if (!prev) return [];
+        return prev.filter(p => p.id !== confirmationId);
+      });
     } catch (error) {
       console.error('Failed to reject order:', error);
     }
@@ -143,6 +161,9 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* API Connection Test */}
+      <ApiTest />
+
       {/* Trading Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card p-6">
@@ -195,7 +216,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">Pending Orders</span>
-              <span className="font-medium">{pendingConfirmations.length}</span>
+              <span className="font-medium">{pendingConfirmations?.length || 0}</span>
             </div>
           </div>
         </div>
@@ -335,7 +356,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Pending Confirmations */}
-      {pendingConfirmations.length > 0 && (
+      {pendingConfirmations && pendingConfirmations.length > 0 && (
         <div className="card">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold">Pending Order Confirmations</h2>
