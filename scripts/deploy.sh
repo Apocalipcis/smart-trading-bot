@@ -86,16 +86,21 @@ run_tests() {
     print_status "Running tests..."
     
     # Run tests in Docker container
+    print_status "Executing pytest in Docker container..."
     docker run --rm \
-        -v "$(pwd)/tests:/app/tests" \
-        -v "$(pwd)/src:/app/src" \
         "${DOCKER_IMAGE}" \
-        python -m pytest tests/ -v --tb=short
+        bash -c "cd /app && python -m pytest tests/ -v --tb=short --color=yes"
     
-    if [ $? -eq 0 ]; then
+    test_exit_code=$?
+    
+    if [ $test_exit_code -eq 0 ]; then
         print_success "Tests passed"
     else
-        print_error "Tests failed"
+        print_error "Tests failed with exit code $test_exit_code"
+        print_status "Showing test logs for debugging..."
+        docker run --rm \
+            "${DOCKER_IMAGE}" \
+            bash -c "cd /app && python -m pytest tests/ -v --tb=long --color=yes" || true
         exit 1
     fi
 }

@@ -1,6 +1,7 @@
 """Tests for the orders package."""
 
 import pytest
+import pytest_asyncio
 import asyncio
 from decimal import Decimal
 from datetime import datetime, timezone
@@ -206,7 +207,7 @@ class TestOrderTypes:
 class TestOrderQueue:
     """Test order queue functionality."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def queue(self):
         """Create order queue for testing."""
         queue = OrderQueue(max_concurrent_orders=2)
@@ -273,7 +274,7 @@ class TestOrderQueue:
 class TestPendingConfirmationStore:
     """Test pending confirmation store."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def store(self):
         """Create pending confirmation store for testing."""
         store = PendingConfirmationStore(default_ttl_seconds=60)

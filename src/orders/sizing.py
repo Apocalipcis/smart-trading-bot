@@ -5,7 +5,7 @@ from decimal import Decimal, ROUND_DOWN
 from enum import Enum
 from typing import Dict, Optional, Union
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, validator
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +36,17 @@ class PositionSizer(BaseModel):
     volatility: Optional[Decimal] = Field(None, description="Asset volatility")
     target_volatility: Optional[Decimal] = Field(None, description="Target portfolio volatility")
     
-    @validator('account_balance', 'risk_percentage', 'min_position_size', 'max_position_size', 
-               'win_rate', 'avg_win', 'avg_loss', 'volatility', 'target_volatility', pre=True)
+    @field_validator('account_balance', 'risk_percentage', 'min_position_size', 'max_position_size', 
+               'win_rate', 'avg_win', 'avg_loss', 'volatility', 'target_volatility', mode='before')
+    @classmethod
     def validate_decimal(cls, v):
         """Convert to Decimal if string or float."""
         if v is None:
             return v
         return Decimal(str(v))
     
-    @validator('risk_percentage')
+    @field_validator('risk_percentage')
+    @classmethod
     def validate_risk_percentage(cls, v):
         """Ensure risk percentage is reasonable."""
         if v > 10:  # Max 10% risk per trade

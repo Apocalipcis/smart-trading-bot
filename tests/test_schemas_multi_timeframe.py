@@ -36,9 +36,9 @@ class TestTimeframeRole:
     
     def test_timeframe_role_membership(self):
         """Test that TimeframeRole values are valid."""
-        assert "HTF" in TimeframeRole
-        assert "LTF" in TimeframeRole
-        assert "INVALID" not in TimeframeRole
+        assert TimeframeRole.HTF in TimeframeRole
+        assert TimeframeRole.LTF in TimeframeRole
+        assert "INVALID" not in [role.value for role in TimeframeRole]
 
 
 class TestTimeframeConstraint:

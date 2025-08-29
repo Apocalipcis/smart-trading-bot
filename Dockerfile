@@ -38,7 +38,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy requirements and install Python dependencies
 COPY pyproject.toml README.md ./
 RUN pip install --upgrade pip && \
-    python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); deps = data['project']['dependencies']; [__import__('subprocess').run(['pip', 'install', dep], check=True) for dep in deps]"
+    python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); deps = data['project']['dependencies']; [__import__('subprocess').run(['pip', 'install', dep], check=True) for dep in deps]" && \
+    python -c "import tomllib; data = tomllib.load(open('pyproject.toml', 'rb')); dev_deps = data['project']['optional-dependencies']['dev']; [__import__('subprocess').run(['pip', 'install', dep], check=True) for dep in dev_deps]"
 
 # Production stage
 FROM python:3.11-slim AS production
@@ -108,6 +109,7 @@ WORKDIR /app
 # Copy application code
 COPY --chown=tradingbot:tradingbot src/ ./src/
 COPY --chown=tradingbot:tradingbot examples/ ./examples/
+COPY --chown=tradingbot:tradingbot tests/ ./tests/
 
 # Create startup script
 RUN echo '#!/bin/bash \n\

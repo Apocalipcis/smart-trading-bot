@@ -304,7 +304,7 @@ class BinanceClient:
         """Get server time for synchronization."""
         return await self._make_request("GET", "/fapi/v1/time")
     
-    async def connect_websocket(self, streams: List[str]) -> websockets.WebSocketServerProtocol:
+    async def connect_websocket(self, streams: List[str]) -> websockets.WebSocketClientProtocol:
         """Connect to WebSocket streams."""
         stream_param = '/'.join(streams)
         ws_url = f"{self.config.ws_url}/stream?streams={stream_param}"

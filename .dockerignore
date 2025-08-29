@@ -49,7 +49,6 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-tests/
 *.md
 !README.md
 .env
