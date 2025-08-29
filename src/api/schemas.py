@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class TradingPair(BaseModel):
@@ -101,10 +101,10 @@ class StrategyMetadata(BaseModel):
 
 class BacktestRequest(BaseModel):
     """Backtest request model with support for multiple timeframes and roles."""
-    pairs: List[str] = Field(..., description="Trading pairs")
+    pairs: Optional[List[str]] = Field(None, description="Trading pairs")
     strategy: str = Field(..., description="Strategy name")
-    timeframes: List[str] = Field(..., description="List of timeframes")
-    tf_roles: Dict[str, TimeframeRole] = Field(..., description="Timeframe to role mapping")
+    timeframes: Optional[List[str]] = Field(None, description="List of timeframes")
+    tf_roles: Optional[Dict[str, TimeframeRole]] = Field(None, description="Timeframe to role mapping")
     start_date: datetime = Field(..., description="Start date")
     end_date: datetime = Field(..., description="End date")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Strategy parameters")
@@ -129,6 +129,8 @@ class BacktestRequest(BaseModel):
     @field_validator('timeframes')
     @classmethod
     def validate_timeframes(cls, v):
+        if v is None:
+            return v  # Allow None for legacy compatibility
         if not v:
             raise ValueError('At least one timeframe must be specified')
         if len(set(v)) != len(v):
@@ -144,8 +146,12 @@ class BacktestRequest(BaseModel):
     @field_validator('tf_roles')
     @classmethod
     def validate_tf_roles(cls, v, info):
+        if v is None:
+            return v  # Allow None for legacy compatibility
         if 'timeframes' in info.data:
             timeframes = info.data['timeframes']
+            if timeframes is None:
+                return v  # Allow None for legacy compatibility
             # Ensure all timeframes have roles assigned
             for tf in timeframes:
                 if tf not in v:
@@ -173,6 +179,8 @@ class BacktestRequest(BaseModel):
     @field_validator('pairs')
     @classmethod
     def validate_pairs(cls, v):
+        if v is None:
+            return v  # Allow None for legacy compatibility
         if not v:
             raise ValueError('At least one trading pair must be specified')
         if len(set(v)) != len(v):
@@ -185,6 +193,28 @@ class BacktestRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError('Strategy name must not be empty')
         return v.strip()
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_legacy_compatibility(cls, data):
+        """Validate that either new fields or legacy fields are provided."""
+        if isinstance(data, dict):
+            # Check if new fields are provided
+            has_new_fields = (data.get('pairs') is not None and 
+                            data.get('timeframes') is not None and 
+                            data.get('tf_roles') is not None)
+            
+            # Check if legacy fields are provided
+            has_legacy_fields = (data.get('pair') is not None and 
+                               data.get('timeframe') is not None)
+            
+            if not has_new_fields and not has_legacy_fields:
+                raise ValueError('Either new fields (pairs, timeframes, tf_roles) or legacy fields (pair, timeframe) must be provided')
+            
+            if has_new_fields and has_legacy_fields:
+                raise ValueError('Cannot mix new fields (pairs, timeframes, tf_roles) with legacy fields (pair, timeframe)')
+        
+        return data
 
 
 class BacktestResult(BaseModel):

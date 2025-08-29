@@ -140,7 +140,7 @@ async def get_strategy(strategy_name: str) -> StrategyInfo:
     )
 
 
-@router.get("/{strategy_name}/validate")
+@router.post("/{strategy_name}/validate")
 async def validate_strategy_requirements(
     strategy_name: str,
     timeframes: List[str],

@@ -76,7 +76,15 @@ async def create_backtest(backtest_request: BacktestRequest) -> BacktestResult:
     if backtest_request.timeframe and not backtest_request.timeframes:
         # Convert legacy single timeframe to new format
         backtest_request.timeframes = [backtest_request.timeframe]
-        backtest_request.tf_roles = {backtest_request.timeframe: "LTF"}
+        
+        # Smart role assignment based on timeframe
+        if backtest_request.timeframe in ["1h", "4h", "1d"]:
+            # Higher timeframes get HTF role
+            backtest_request.tf_roles = {backtest_request.timeframe: "HTF"}
+        else:
+            # Lower timeframes get LTF role
+            backtest_request.tf_roles = {backtest_request.timeframe: "LTF"}
+        
         backtest_request.pairs = [backtest_request.pair] if backtest_request.pair else []
         backtest_request.initial_balance = backtest_request.initial_capital or 10000.0
         backtest_request.risk_per_trade = 2.0
@@ -94,15 +102,35 @@ async def create_backtest(backtest_request: BacktestRequest) -> BacktestResult:
         backtest_request.tf_roles
     )
     
+    # For legacy single-timeframe requests, be more lenient with validation
+    is_legacy_request = backtest_request.timeframe and len(backtest_request.timeframes) == 1
+    
     if not strategy_validation["valid"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": "Strategy validation failed",
-                "errors": strategy_validation["errors"],
-                "warnings": strategy_validation["warnings"]
-            }
-        )
+        if is_legacy_request:
+            # For legacy requests, only fail on constraint violations, not missing roles
+            constraint_errors = [error for error in strategy_validation["errors"] 
+                               if "too small" in error.lower() or "too large" in error.lower()]
+            if constraint_errors:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Strategy validation failed",
+                        "errors": constraint_errors,
+                        "warnings": strategy_validation["warnings"]
+                    }
+                )
+            # For missing roles in legacy requests, just add warnings
+            deprecation_warnings.extend([f"Warning: {error}" for error in strategy_validation["errors"] 
+                                       if "required role" in error.lower()])
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Strategy validation failed",
+                    "errors": strategy_validation["errors"],
+                    "warnings": strategy_validation["warnings"]
+                }
+            )
     
     # Add strategy validation warnings to deprecation warnings
     deprecation_warnings.extend(strategy_validation["warnings"])

@@ -127,7 +127,7 @@ ROLE_CONSTRAINTS = [
     TimeframeConstraint(
         role=TimeframeRole.HTF,
         min_timeframe="1h",
-        max_timeframe="1M",
+        max_timeframe="1d",
         description="Higher timeframes should be 1h or greater for trend analysis"
     ),
     TimeframeConstraint(
@@ -169,7 +169,7 @@ async def get_timeframe_info(timeframe: str) -> AvailableTimeframe:
     )
 
 
-@router.get("/timeframes/validate")
+@router.post("/timeframes/validate")
 async def validate_timeframe_roles(
     timeframes: List[str],
     tf_roles: dict
@@ -204,15 +204,20 @@ async def validate_timeframe_roles(
     for constraint in ROLE_CONSTRAINTS:
         for tf, role in tf_roles.items():
             if role == constraint.role:
-                # Validate against min/max constraints
-                tf_minutes = _timeframe_to_minutes(tf)
-                min_minutes = _timeframe_to_minutes(constraint.min_timeframe)
-                max_minutes = _timeframe_to_minutes(constraint.max_timeframe)
-                
-                if tf_minutes < min_minutes:
-                    errors.append(f"Timeframe '{tf}' is too small for role '{role}'. Minimum: {constraint.min_timeframe}")
-                elif tf_minutes > max_minutes:
-                    errors.append(f"Timeframe '{tf}' is too large for role '{role}'. Maximum: {constraint.max_timeframe}")
+                try:
+                    # Validate against min/max constraints
+                    tf_minutes = _timeframe_to_minutes(tf)
+                    min_minutes = _timeframe_to_minutes(constraint.min_timeframe)
+                    max_minutes = _timeframe_to_minutes(constraint.max_timeframe)
+                    
+                    if tf_minutes < min_minutes:
+                        errors.append(f"Timeframe '{tf}' is too small for role '{role}'. Minimum: {constraint.min_timeframe}")
+                    elif tf_minutes > max_minutes:
+                        errors.append(f"Timeframe '{tf}' is too large for role '{role}'. Maximum: {constraint.max_timeframe}")
+                except ValueError:
+                    # Invalid timeframe format - this should already be caught by the timeframe existence check
+                    # but we'll add it here as a fallback
+                    errors.append(f"Invalid timeframe format: '{tf}'")
     
     return APIResponse(
         success=len(errors) == 0,
