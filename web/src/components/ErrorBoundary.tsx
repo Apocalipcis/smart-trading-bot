@@ -22,6 +22,10 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Store error info for development debugging
+    if (process.env.NODE_ENV === 'development') {
+      this.setState({ errorInfo });
+    }
   }
 
   render() {

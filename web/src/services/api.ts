@@ -75,8 +75,11 @@ class ApiClient {
           }
         }
         
+        // Better error logging for development
         if (error.response?.status === 403) {
           console.warn('API access forbidden - trading may be disabled:', error.response?.data?.detail || error.message);
+        } else if (error.code === 'ECONNREFUSED') {
+          console.error('Connection refused - backend server may not be running on port 8000');
         } else {
           console.error('API Response Error:', error.response?.data || error.message);
         }

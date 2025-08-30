@@ -15,7 +15,6 @@ NC='\033[0m' # No Color
 # Configuration
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
-
 # Function to print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -125,7 +124,7 @@ start_backend() {
     export ORDER_CONFIRMATION_REQUIRED=true
     
     # Start the backend server
-    uvicorn src.api.main:app --host 0.0.0.0 --port $BACKEND_PORT --reload &
+    PYTHONPATH=. uvicorn src.api.main:app --host 0.0.0.0 --port $BACKEND_PORT --reload &
     BACKEND_PID=$!
     
     print_success "Backend started on http://localhost:$BACKEND_PORT"
@@ -205,6 +204,12 @@ trap cleanup EXIT
 main() {
     print_status "Starting Trading Bot Development Environment"
     print_status "============================================="
+    
+    # Ensure we're in the project root
+    if [ ! -f "pyproject.toml" ]; then
+        print_error "Please run this script from the project root directory"
+        exit 1
+    fi
     
     check_prerequisites
     setup_python_env
