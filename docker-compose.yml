@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"  # Web interface
+        - "3001:8000"  # API (for frontend access)
       - "8000:8000"  # API (for direct access)
     volumes:
       - ./data:/data

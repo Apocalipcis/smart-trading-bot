@@ -98,28 +98,51 @@ class BinanceClient:
             params['timestamp'] = int(time.time() * 1000)
             # Note: In production, implement proper signature generation
             params['signature'] = "dummy_signature"  # Placeholder
-            
+        
         headers = {}
         if self.config.api_key:
             headers['X-MBX-APIKEY'] = self.config.api_key
-            
-        for attempt in range(self.config.max_retries):
+        
+        # Retry logic with exponential backoff
+        max_attempts = self.config.max_retries + 1
+        for attempt in range(max_attempts):
             try:
-                response = await self._session.request(
-                    method, url, params=params, headers=headers
-                )
+                if method.upper() == "GET":
+                    response = await self._session.get(url, params=params, headers=headers)
+                elif method.upper() == "POST":
+                    response = await self._session.post(url, json=params, headers=headers)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
+                
                 response.raise_for_status()
                 return response.json()
+                
+            except httpx.TimeoutException as e:
+                logger.warning(f"Request timeout on attempt {attempt + 1}/{max_attempts}: {e}")
+                if attempt == max_attempts - 1:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))  # Cap backoff at 30 seconds
+                
             except httpx.HTTPStatusError as e:
-                if e.response.status_code >= 500 and attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                    continue
-                raise
+                logger.error(f"HTTP error on attempt {attempt + 1}/{max_attempts}: {e.response.status_code} - {e.response.text}")
+                if attempt == max_attempts - 1:
+                    raise
+                # Don't retry on client errors (4xx) except rate limiting
+                if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))
+                
+            except httpx.RequestError as e:
+                logger.error(f"Request error on attempt {attempt + 1}/{max_attempts}: {e}")
+                if attempt == max_attempts - 1:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))
+                
             except Exception as e:
-                if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                raise
+                logger.error(f"Unexpected error on attempt {attempt + 1}/{max_attempts}: {e}")
+                if attempt == max_attempts - 1:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))
     
     async def get_exchange_info(self) -> Dict[str, Any]:
         """Get exchange information including symbol rules."""
