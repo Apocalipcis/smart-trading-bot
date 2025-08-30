@@ -30,6 +30,8 @@ class StrategyInfo:
         self.registration_date = datetime.utcnow()
         self.description = getattr(strategy_class, '__doc__', 'No description available')
         self.parameters = self._extract_parameters()
+        self.required_roles = self._extract_required_roles()
+        self.role_constraints = self._extract_role_constraints()
     
     def _extract_parameters(self) -> Dict[str, Any]:
         """Extract strategy parameters from the class."""
@@ -45,6 +47,33 @@ class StrategyInfo:
                     return {}
         return {}
     
+    def _extract_required_roles(self) -> List[str]:
+        """Extract required roles from the strategy class."""
+        if hasattr(self.strategy_class, 'required_roles'):
+            return list(self.strategy_class.required_roles)
+        elif hasattr(self.strategy_class, 'REQUIRED_ROLES'):
+            return list(self.strategy_class.REQUIRED_ROLES)
+        else:
+            # Default to LTF for single-timeframe strategies
+            return ['LTF']
+    
+    def _extract_role_constraints(self) -> List[Dict[str, Any]]:
+        """Extract role constraints from the strategy class."""
+        if hasattr(self.strategy_class, 'role_constraints'):
+            return list(self.strategy_class.role_constraints)
+        elif hasattr(self.strategy_class, 'ROLE_CONSTRAINTS'):
+            return list(self.strategy_class.ROLE_CONSTRAINTS)
+        else:
+            # Default constraints
+            return [
+                {
+                    'role': 'LTF',
+                    'min_timeframe': '1m',
+                    'max_timeframe': '1h',
+                    'description': 'Lower timeframe for entry/exit timing'
+                }
+            ]
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
@@ -53,7 +82,9 @@ class StrategyInfo:
             'file_path': self.file_path,
             'registration_date': self.registration_date.isoformat(),
             'description': self.description,
-            'parameters': self.parameters
+            'parameters': self.parameters,
+            'required_roles': self.required_roles,
+            'role_constraints': self.role_constraints
         }
     
     def __repr__(self):

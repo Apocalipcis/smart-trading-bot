@@ -54,6 +54,25 @@ class SMCStrategy(BaseStrategy):
         ('max_positions', 3),              # Maximum 3 concurrent positions
     )
     
+    # Multi-timeframe role requirements
+    required_roles = ['HTF', 'LTF']
+    
+    # Role constraints
+    role_constraints = [
+        {
+            'role': 'HTF',
+            'min_timeframe': '1h',
+            'max_timeframe': '1d',
+            'description': 'Higher timeframe for trend direction and market structure'
+        },
+        {
+            'role': 'LTF',
+            'min_timeframe': '5m',
+            'max_timeframe': '30m',
+            'description': 'Lower timeframe for entry/exit timing and order block identification'
+        }
+    ]
+    
     def __init__(self):
         """Initialize the SMC strategy."""
         super().__init__()

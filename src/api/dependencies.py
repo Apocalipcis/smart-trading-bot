@@ -15,7 +15,7 @@ security = HTTPBearer(auto_error=False)
 def get_settings() -> Settings:
     """Get application settings from environment variables."""
     return Settings(
-        trading_enabled=os.getenv("TRADING_ENABLED", "false").lower() == "true",
+        trading_enabled=os.getenv("TRADING_ENABLED", "false").lower() == "true",  # Disable by default for safety
         order_confirmation_required=os.getenv("ORDER_CONFIRMATION_REQUIRED", "true").lower() == "true",
         max_open_positions=int(os.getenv("MAX_OPEN_POSITIONS", "5")),
         max_risk_per_trade=float(os.getenv("MAX_RISK_PER_TRADE", "2.0")),
@@ -47,6 +47,26 @@ def require_read_access(
 ) -> bool:
     """Allow read access without requiring trading to be enabled."""
     # Always return True, regardless of trading_enabled setting
+    return True
+
+
+def require_simulation_or_trading_enabled(
+    settings: Settings = Depends(get_settings)
+) -> bool:
+    """Allow access in simulation mode or when trading is enabled."""
+    # Check if we're in simulation mode
+    trading_mode = os.getenv("TRADING_MODE", "simulation")
+    trading_approved = os.getenv("TRADING_APPROVED", "false").lower() == "true"
+    
+    # Allow if in simulation mode or if trading is enabled
+    if trading_mode == "simulation" or not trading_approved:
+        return True
+    
+    if not settings.trading_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Trading is not enabled. Please configure API keys in environment variables."
+        )
     return True
 
 

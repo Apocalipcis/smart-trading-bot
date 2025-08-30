@@ -62,17 +62,7 @@ async def get_signals(
     )
 
 
-@router.get("/{signal_id}", response_model=Signal)
-async def get_signal(signal_id: str) -> Signal:
-    """Get a specific signal by ID."""
-    for signal in _signals:
-        if str(signal.id) == signal_id:
-            return signal
-    
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Signal {signal_id} not found"
-    )
+# Placeholder for signal ID route - will be moved after stream routes
 
 
 @router.get("/stream/sse")
@@ -145,6 +135,19 @@ async def stream_signals_websocket():
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="WebSocket streaming not yet implemented"
+    )
+
+
+@router.get("/{signal_id}", response_model=Signal)
+async def get_signal(signal_id: str) -> Signal:
+    """Get a specific signal by ID."""
+    for signal in _signals:
+        if str(signal.id) == signal_id:
+            return signal
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Signal {signal_id} not found"
     )
 
 

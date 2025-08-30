@@ -11,8 +11,19 @@ const Settings: React.FC = () => {
   const [formData, setFormData] = useState<Partial<SettingsType>>({});
 
   useEffect(() => {
+    console.log('🚀 Settings component mounted');
     loadSettings();
   }, []);
+
+  // Track settings state changes
+  useEffect(() => {
+    console.log('📊 Settings state changed:', settings);
+  }, [settings]);
+
+  // Track formData state changes
+  useEffect(() => {
+    console.log('📝 FormData state changed:', formData);
+  }, [formData]);
 
   const loadSettings = async () => {
     try {

@@ -8,10 +8,11 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"  # Web interface
+      - "3001:8000"  # API (for frontend access)
       - "8000:8000"  # API (for direct access)
     volumes:
       - ./data:/data
-      - ./logs:/app/logsit
+      - ./logs:/app/logs
     environment:
       - DATA_DIR=/data
       - DB_PATH=/data/app.db

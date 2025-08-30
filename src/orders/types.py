@@ -6,7 +6,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, validator
 
 
 class OrderSide(str, Enum):
@@ -55,21 +55,24 @@ class Order(BaseModel):
     commission: Decimal = Field(default=Decimal('0'), description="Commission paid")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     
-    @validator('quantity', 'price', 'stop_price', 'filled_quantity', 'commission', pre=True)
+    @field_validator('quantity', 'price', 'stop_price', 'filled_quantity', 'commission', mode='before')
+    @classmethod
     def validate_decimal(cls, v):
         """Convert to Decimal if string or float."""
         if v is None:
             return v
         return Decimal(str(v))
     
-    @validator('quantity', 'filled_quantity')
+    @field_validator('quantity', 'filled_quantity')
+    @classmethod
     def validate_positive_quantity(cls, v):
         """Ensure quantity is positive."""
         if v <= 0:
             raise ValueError("Quantity must be positive")
         return v
     
-    @validator('price', 'stop_price')
+    @field_validator('price', 'stop_price')
+    @classmethod
     def validate_positive_price(cls, v):
         """Ensure price is positive if provided."""
         if v is not None and v <= 0:
@@ -107,11 +110,12 @@ class Order(BaseModel):
             return 0.0
         return float(self.filled_quantity / self.quantity * 100)
     
-    class Config:
-        json_encoders = {
+    model_config = {
+        "json_encoders": {
             Decimal: str,
             datetime: lambda v: v.isoformat()
         }
+    }
 
 
 class MarketOrder(Order):
@@ -120,7 +124,8 @@ class MarketOrder(Order):
     order_type: OrderType = Field(default=OrderType.MARKET)
     price: Optional[Decimal] = Field(None, description="Market orders don't have a price")
     
-    @validator('price')
+    @field_validator('price')
+    @classmethod
     def validate_market_price(cls, v):
         """Market orders should not have a price."""
         if v is not None:
@@ -135,7 +140,8 @@ class LimitOrder(Order):
     price: Decimal = Field(..., description="Limit price")
     time_in_force: str = Field(default="GTC", description="Time in force")
     
-    @validator('price')
+    @field_validator('price')
+    @classmethod
     def validate_limit_price(cls, v):
         """Limit orders must have a price."""
         if v is None:
@@ -150,14 +156,16 @@ class StopMarketOrder(Order):
     stop_price: Decimal = Field(..., description="Stop price")
     price: Optional[Decimal] = Field(None, description="Stop market orders don't have a price")
     
-    @validator('stop_price')
+    @field_validator('stop_price')
+    @classmethod
     def validate_stop_price(cls, v):
         """Stop orders must have a stop price."""
         if v is None:
             raise ValueError("Stop orders must have a stop price")
         return v
     
-    @validator('price')
+    @field_validator('price')
+    @classmethod
     def validate_stop_market_price(cls, v):
         """Stop market orders should not have a price."""
         if v is not None:
@@ -172,8 +180,9 @@ class StopLimitOrder(Order):
     stop_price: Decimal = Field(..., description="Stop price")
     price: Decimal = Field(..., description="Limit price")
     
-    @validator('stop_price', 'price')
-    def validate_stop_limit_prices(cls, v, values):
+    @field_validator('stop_price', 'price')
+    @classmethod
+    def validate_stop_limit_prices(cls, v, info):
         """Validate stop and limit prices."""
         if v is None:
             raise ValueError("Stop limit orders must have both stop and limit prices")
@@ -189,8 +198,9 @@ class TrailingStopOrder(Order):
     trailing_distance: Optional[Decimal] = Field(None, description="Trailing distance")
     activation_price: Optional[Decimal] = Field(None, description="Activation price")
     
-    @validator('trailing_percent', 'trailing_distance')
-    def validate_trailing_params(cls, v, values):
+    @field_validator('trailing_percent', 'trailing_distance')
+    @classmethod
+    def validate_trailing_params(cls, v, info):
         """Validate trailing parameters."""
         if v is not None and v <= 0:
             raise ValueError("Trailing parameters must be positive")

@@ -37,6 +37,7 @@ class BinanceDataFeed(bt.feeds.PandasData):
         ('exchange', 'binance_futures'),  # Exchange name
         ('symbol', ''),  # Trading symbol
         ('stream_manager', None),  # WebSocket stream manager for live mode
+        ('role', None),  # Role for multi-timeframe strategies (HTF/LTF)
     )
     
     def __init__(self, **kwargs):
@@ -45,6 +46,7 @@ class BinanceDataFeed(bt.feeds.PandasData):
         self.live_mode = kwargs.get('live', False)
         self.data_dir = Path(kwargs.get('data_dir', './data'))
         self.exchange = kwargs.get('exchange', 'binance_futures')
+        self.role = kwargs.get('role', None)  # HTF or LTF
         
         # Get symbol from kwargs or params
         if 'symbol' in kwargs:
@@ -79,6 +81,10 @@ class BinanceDataFeed(bt.feeds.PandasData):
         self._data: Optional[pd.DataFrame] = None
         self._current_index = 0
         self._last_timestamp = None
+        
+        # Multi-timeframe synchronization
+        self._sync_timestamp = None
+        self._role_data_cache = {}
         
     def _convert_timeframe_to_interval(self, timeframe, compression: int) -> str:
         """Convert Backtrader timeframe and compression to interval string."""
@@ -436,3 +442,93 @@ class BinanceDataFeed(bt.feeds.PandasData):
                 return f'offline_{len(self._data)}_candles'
             else:
                 return 'offline_no_data'
+
+    # Multi-timeframe synchronization methods
+    
+    def set_sync_timestamp(self, timestamp: datetime.datetime):
+        """Set synchronization timestamp for multi-timeframe coordination."""
+        self._sync_timestamp = timestamp
+    
+    def get_sync_timestamp(self) -> Optional[datetime.datetime]:
+        """Get the current synchronization timestamp."""
+        return self._sync_timestamp
+    
+    def is_synchronized(self, other_feed: 'BinanceDataFeed') -> bool:
+        """
+        Check if this feed is synchronized with another feed.
+        
+        Args:
+            other_feed: Another BinanceDataFeed instance
+            
+        Returns:
+            bool: True if feeds are synchronized, False otherwise
+        """
+        if self._sync_timestamp is None or other_feed._sync_timestamp is None:
+            return False
+        
+        # Allow for small timing differences (1 second tolerance)
+        time_diff = abs((self._sync_timestamp - other_feed._sync_timestamp).total_seconds())
+        return time_diff <= 1.0
+    
+    def get_role_data(self, role: str) -> Optional[pd.DataFrame]:
+        """
+        Get cached data for a specific role.
+        
+        Args:
+            role: The role to get data for ('HTF' or 'LTF')
+            
+        Returns:
+            Optional[pd.DataFrame]: Cached data for the role, or None if not available
+        """
+        return self._role_data_cache.get(role)
+    
+    def cache_role_data(self, role: str, data: pd.DataFrame):
+        """
+        Cache data for a specific role.
+        
+        Args:
+            role: The role to cache data for ('HTF' or 'LTF')
+            data: DataFrame to cache
+        """
+        self._role_data_cache[role] = data.copy()
+    
+    def clear_role_cache(self, role: Optional[str] = None):
+        """
+        Clear cached data for a role or all roles.
+        
+        Args:
+            role: Specific role to clear, or None to clear all
+        """
+        if role is None:
+            self._role_data_cache.clear()
+        else:
+            self._role_data_cache.pop(role, None)
+    
+    def get_timeframe_minutes(self) -> int:
+        """Get the timeframe duration in minutes."""
+        return self._interval_to_minutes(self.interval)
+    
+    def _interval_to_minutes(self, interval: str) -> int:
+        """Convert interval string to minutes."""
+        if interval.endswith('m'):
+            return int(interval[:-1])
+        elif interval.endswith('h'):
+            return int(interval[:-1]) * 60
+        elif interval.endswith('d'):
+            return int(interval[:-1]) * 1440
+        elif interval.endswith('w'):
+            return int(interval[:-1]) * 10080
+        elif interval.endswith('M'):
+            return int(interval[:-1]) * 43200
+        else:
+            return 1  # Default to 1 minute
+    
+    def get_role_info(self) -> Dict[str, Any]:
+        """Get information about the feed's role in multi-timeframe setup."""
+        return {
+            'role': self.role,
+            'interval': self.interval,
+            'minutes': self.get_timeframe_minutes(),
+            'sync_timestamp': self._sync_timestamp.isoformat() if self._sync_timestamp else None,
+            'cached_roles': list(self._role_data_cache.keys())
+        }
