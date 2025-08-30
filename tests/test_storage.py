@@ -9,6 +9,7 @@ from typing import Dict, Any
 
 import pandas as pd
 import pytest
+import pytest_asyncio
 
 from src.storage import (
     DatabaseManager,
@@ -25,7 +26,7 @@ from src.storage import (
 class TestDatabaseManager:
     """Test database manager functionality."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def db_manager(self):
         """Create a temporary database for testing."""
         temp_dir = None
@@ -87,7 +88,7 @@ class TestDatabaseManager:
 class TestSettingsManager:
     """Test settings manager functionality."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def settings_manager(self):
         """Create a settings manager with temporary database."""
         temp_dir = None
@@ -213,7 +214,7 @@ class TestFileManager:
     def test_save_and_load_candles(self, file_manager):
         """Test saving and loading candle data."""
         # Create sample data
-        dates = pd.date_range('2023-01-01', periods=100, freq='1H')
+        dates = pd.date_range('2023-01-01', periods=100, freq='1h')
         df = pd.DataFrame({
             'open': [100 + i for i in range(100)],
             'high': [101 + i for i in range(100)],

@@ -98,28 +98,51 @@ class BinanceClient:
             params['timestamp'] = int(time.time() * 1000)
             # Note: In production, implement proper signature generation
             params['signature'] = "dummy_signature"  # Placeholder
-            
+        
         headers = {}
         if self.config.api_key:
             headers['X-MBX-APIKEY'] = self.config.api_key
-            
-        for attempt in range(self.config.max_retries):
+        
+        # Retry logic with exponential backoff
+        max_attempts = self.config.max_retries + 1
+        for attempt in range(max_attempts):
             try:
-                response = await self._session.request(
-                    method, url, params=params, headers=headers
-                )
+                if method.upper() == "GET":
+                    response = await self._session.get(url, params=params, headers=headers)
+                elif method.upper() == "POST":
+                    response = await self._session.post(url, json=params, headers=headers)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
+                
                 response.raise_for_status()
                 return response.json()
+                
+            except httpx.TimeoutException as e:
+                logger.warning(f"Request timeout on attempt {attempt + 1}/{max_attempts}: {e}")
+                if attempt == max_attempts - 1:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))  # Cap backoff at 30 seconds
+                
             except httpx.HTTPStatusError as e:
-                if e.response.status_code >= 500 and attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                    continue
-                raise
+                logger.error(f"HTTP error on attempt {attempt + 1}/{max_attempts}: {e.response.status_code} - {e.response.text}")
+                if attempt == max_attempts - 1:
+                    raise
+                # Don't retry on client errors (4xx) except rate limiting
+                if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))
+                
+            except httpx.RequestError as e:
+                logger.error(f"Request error on attempt {attempt + 1}/{max_attempts}: {e}")
+                if attempt == max_attempts - 1:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))
+                
             except Exception as e:
-                if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                raise
+                logger.error(f"Unexpected error on attempt {attempt + 1}/{max_attempts}: {e}")
+                if attempt == max_attempts - 1:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30))
     
     async def get_exchange_info(self) -> Dict[str, Any]:
         """Get exchange information including symbol rules."""
@@ -165,6 +188,98 @@ class BinanceClient:
             klines.append(kline)
             
         return klines
+
+    async def get_klines_multi_timeframe(
+        self,
+        symbol: str,
+        intervals: List[str],
+        limit: int = 500,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None
+    ) -> Dict[str, List[KlineData]]:
+        """
+        Get kline data for multiple timeframes in parallel.
+        
+        Args:
+            symbol: Trading symbol
+            intervals: List of timeframe intervals
+            limit: Number of klines per timeframe
+            start_time: Start time in milliseconds
+            end_time: End time in milliseconds
+            
+        Returns:
+            Dict[str, List[KlineData]]: Dictionary mapping intervals to kline data
+        """
+        import asyncio
+        
+        # Create tasks for parallel execution
+        tasks = []
+        for interval in intervals:
+            task = self.get_klines(
+                symbol=symbol,
+                interval=interval,
+                limit=limit,
+                start_time=start_time,
+                end_time=end_time
+            )
+            tasks.append((interval, task))
+        
+        # Execute all tasks in parallel
+        results = {}
+        for interval, task in tasks:
+            try:
+                klines = await task
+                results[interval] = klines
+            except Exception as e:
+                # Log error but continue with other timeframes
+                print(f"Error fetching {interval} data for {symbol}: {e}")
+                results[interval] = []
+        
+        return results
+
+    async def validate_timeframe(self, interval: str) -> bool:
+        """
+        Validate if a timeframe is supported by the exchange.
+        
+        Args:
+            interval: Timeframe interval to validate
+            
+        Returns:
+            bool: True if timeframe is supported, False otherwise
+        """
+        # Binance supported intervals
+        supported_intervals = [
+            '1m', '3m', '5m', '15m', '30m',
+            '1h', '2h', '4h', '6h', '8h', '12h',
+            '1d', '3d', '1w', '1M'
+        ]
+        
+        return interval in supported_intervals
+
+    async def get_timeframe_limits(self) -> Dict[str, Dict[str, int]]:
+        """
+        Get timeframe-specific limits and constraints.
+        
+        Returns:
+            Dict[str, Dict[str, int]]: Limits for each timeframe
+        """
+        return {
+            '1m': {'max_klines': 1000, 'min_klines': 1},
+            '3m': {'max_klines': 1000, 'min_klines': 1},
+            '5m': {'max_klines': 1000, 'min_klines': 1},
+            '15m': {'max_klines': 1000, 'min_klines': 1},
+            '30m': {'max_klines': 1000, 'min_klines': 1},
+            '1h': {'max_klines': 1000, 'min_klines': 1},
+            '2h': {'max_klines': 1000, 'min_klines': 1},
+            '4h': {'max_klines': 1000, 'min_klines': 1},
+            '6h': {'max_klines': 1000, 'min_klines': 1},
+            '8h': {'max_klines': 1000, 'min_klines': 1},
+            '12h': {'max_klines': 1000, 'min_klines': 1},
+            '1d': {'max_klines': 1000, 'min_klines': 1},
+            '3d': {'max_klines': 1000, 'min_klines': 1},
+            '1w': {'max_klines': 1000, 'min_klines': 1},
+            '1M': {'max_klines': 1000, 'min_klines': 1}
+        }
     
     async def get_recent_trades(self, symbol: str, limit: int = 500) -> List[TradeData]:
         """Get recent trades for a symbol."""
@@ -212,7 +327,7 @@ class BinanceClient:
         """Get server time for synchronization."""
         return await self._make_request("GET", "/fapi/v1/time")
     
-    async def connect_websocket(self, streams: List[str]) -> websockets.WebSocketServerProtocol:
+    async def connect_websocket(self, streams: List[str]) -> websockets.WebSocketClientProtocol:
         """Connect to WebSocket streams."""
         stream_param = '/'.join(streams)
         ws_url = f"{self.config.ws_url}/stream?streams={stream_param}"

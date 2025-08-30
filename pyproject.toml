@@ -36,7 +36,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+asyncio_mode = "strict"
 markers = [
     "asyncio: marks tests as async (deselect with '-m \"not asyncio\"')",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

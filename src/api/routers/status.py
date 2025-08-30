@@ -8,9 +8,9 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException
 
 from ..schemas import HealthStatus
-from ...storage.db import get_db_manager
-from ...data.binance_client import BinanceClient
-from ...logging_config import get_logger
+from src.storage.db import get_db_manager
+from src.data.binance_client import BinanceClient
+from src.logging_config import get_logger
 
 router = APIRouter(prefix="/status", tags=["status"])
 
@@ -94,7 +94,7 @@ async def _check_exchange_connection() -> bool:
     """Check exchange connection status."""
     try:
         # Create a temporary client to test connection
-        from ...data.binance_client import BinanceConfig
+        from src.data.binance_client import BinanceConfig
         config = BinanceConfig()  # Use default config
         
         async with BinanceClient(config) as client:

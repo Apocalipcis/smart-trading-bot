@@ -111,10 +111,10 @@ class BacktestMetrics:
             additional = self._calculate_additional_metrics(trade_metrics, initial_capital)
             
             return {
-                "performance": performance.dict(),
-                "risk": risk.dict(),
+                "performance": performance.model_dump(),
+                "risk": risk.model_dump(),
                 "additional": additional,
-                "trade_metrics": [t.dict() for t in trade_metrics]
+                "trade_metrics": [t.model_dump() for t in trade_metrics]
             }
             
         except Exception as e:

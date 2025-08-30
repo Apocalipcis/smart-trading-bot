@@ -51,7 +51,7 @@ class BacktestStorage:
             file_path = date_dir / filename
             
             # Convert result to dict and handle datetime serialization
-            result_dict = result.dict()
+            result_dict = result.model_dump()
             result_dict["start_time"] = result.start_time.isoformat()
             result_dict["end_time"] = result.end_time.isoformat()
             result_dict["config"]["start_date"] = result.config.start_date.isoformat()

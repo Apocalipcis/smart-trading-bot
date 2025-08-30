@@ -43,6 +43,10 @@ class DatabaseManager:
                 # Create tables
                 await self._create_tables()
                 
+                # Run migrations to update schema if needed
+                from .migrations import run_database_migrations
+                await run_database_migrations(self.db_path)
+                
                 # Create indexes
                 await self._create_indexes()
                 
@@ -114,11 +118,12 @@ class DatabaseManager:
             # Pairs table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS pairs (
-                    symbol TEXT PRIMARY KEY,
-                    exchange TEXT NOT NULL,
-                    base_asset TEXT NOT NULL,
-                    quote_asset TEXT NOT NULL,
-                    status TEXT DEFAULT 'active',
+                    id TEXT PRIMARY KEY,
+                    symbol TEXT UNIQUE NOT NULL,
+                    base_asset TEXT,
+                    quote_asset TEXT,
+                    strategy TEXT NOT NULL,
+                    is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -198,8 +203,9 @@ class DatabaseManager:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_backtest_created_at ON backtest_metadata(created_at)")
             
             # Pairs indexes
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_pairs_status ON pairs(status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_pairs_exchange ON pairs(exchange)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pairs_symbol ON pairs(symbol)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pairs_strategy ON pairs(strategy)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pairs_is_active ON pairs(is_active)")
             
             conn.commit()
             logger.info("Database indexes created successfully")
