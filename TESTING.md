@@ -288,7 +288,7 @@ class TestAPIEndpoints:
         """Test backtest creation endpoint."""
         backtest_data = {
             "pair": "BTCUSDT",
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "timeframe": "1m",
             "start_date": "2024-01-01T00:00:00Z",
             "end_date": "2024-01-15T00:00:00Z",

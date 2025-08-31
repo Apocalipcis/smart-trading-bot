@@ -5,10 +5,10 @@ A professional trading bot built with Python, FastAPI, and Backtrader for crypto
 ## 🚀 Features
 
 - **Real-time Data**: WebSocket streaming from Binance USDT-M Futures
-- **Backtesting Engine**: Full Backtrader integration with historical data
+- **Backtesting Engine**: Full Backtrader integration with multi-timeframe support
 - **Trading Strategies**: Plugin-based strategy system with Smart Money Concepts (SMC)
 - **Risk Management**: Configurable position sizing, stop-loss, and take-profit
-- **Simulation Engine**: Complete paper trading environment with dual-mode support
+- **Simulation Engine**: Complete paper trading environment with portfolio management
 - **Web Interface**: Modern SPA dashboard for monitoring and control
 - **Telegram Notifications**: Real-time alerts for signals and backtest results
 - **API-First Design**: RESTful API with WebSocket/SSE streaming support
@@ -29,38 +29,62 @@ smart-trading-bot/
 │   │   ├── feed.py
 │   │   ├── validators.py
 │   │   └── rate_limit.py
-│   ├── backtests/         # Backtesting engine
+│   ├── backtests/         # Backtesting engine (✅ COMPLETED)
 │   ├── strategies/        # Trading strategies (✅ COMPLETED)
-│   ├── orders/            # Order management
+│   ├── orders/            # Order management (🔄 IN PROGRESS)
 │   ├── simulation/        # Simulation engine (✅ COMPLETED)
-│   └── storage/           # Database & file storage
-├── web/                   # Frontend SPA
+│   └── storage/           # Database & file storage (🔄 IN PROGRESS)
+├── web/                   # Frontend SPA (🔄 IN PROGRESS)
 ├── data/                  # Persistent data storage
-├── tests/                 # Test suite
-└── docker/                # Containerization
+├── tests/                 # Test suite (✅ COMPLETED)
+└── docker/                # Containerization (📝 PLANNED)
 ```
 
 ## 📋 Current Status
 
-### ✅ Completed
+### ✅ Completed (85%)
 - **Data Layer**: Complete Binance integration with WebSocket streaming
 - **API Layer**: Full FastAPI implementation with all endpoints
 - **Strategies Package**: Complete trading strategy system with SMC implementation
 - **Simulation Engine**: Complete paper trading environment with portfolio management
+- **Backtesting Engine**: Full Backtrader integration with multi-timeframe support
 - **Structured Logging**: JSON logs with correlation IDs
 - **Telegram Integration**: Rich notification system
 - **Health Monitoring**: System status and metrics
-- **Testing**: Pytest setup with working tests
+- **Testing**: Comprehensive pytest setup with 100+ tests
 
-### 🔄 In Progress
-- **Backtesting Engine**: Backtrader integration
-- **Order Management**: Position sizing and execution
-- **Storage Layer**: Database and file management
+### 🔄 In Progress (10%)
+- **Order Management**: Position sizing and execution logic
+- **Storage Layer**: Database optimization and file management
+- **Web UI**: React/Vite frontend development
 
-### 📝 Planned
-- **Web UI**: React/Vite frontend
-- **Docker**: Containerization
+### 📝 Planned (5%)
+- **Docker**: Containerization and deployment
 - **CI/CD**: GitHub Actions pipeline
+- **Advanced Analytics**: Enhanced reporting and visualization
+
+## 🆕 Latest Features & Improvements
+
+### Multi-Timeframe Backtest Engine (v1.0.0)
+- **Multi-timeframe support**: Configurable timeframes with role-based analysis (HTF/LTF)
+- **Strategy compatibility**: Support for SMC and SimpleTest strategies
+- **Data validation**: Comprehensive date range and data availability checks
+- **Result formatting**: Proper UUID-based result identification and metadata
+- **Performance metrics**: Sharpe ratio, drawdown, win rate, and more
+
+### Simulation Engine (v1.0.0)
+- **Complete paper trading environment**: Risk-free strategy testing
+- **Real-time portfolio management**: P&L tracking and position management
+- **Order simulation**: Market orders with slippage and commission
+- **Performance analytics**: Comprehensive trading metrics
+- **Data isolation**: Separate simulation database tables
+
+### Smart Money Concepts Strategy (v1.0.0)
+- **Institutional order flow analysis**: Advanced market structure detection
+- **Liquidity zone identification**: Support and resistance levels
+- **Order block detection**: Institutional accumulation/distribution zones
+- **Fair value gap analysis**: Price inefficiency identification
+- **Multi-timeframe confirmation**: HTF trend validation
 
 ## 🎯 Trading Modes
 
@@ -73,7 +97,7 @@ The bot supports two distinct trading modes:
 - **No API Keys Required**: Safe for development and testing
 - **Complete Isolation**: Separate database tables and storage
 
-### Live Trading Mode
+### Live Trading Mode (Coming Soon)
 - **Real Trading**: Actual order execution on Binance Futures
 - **Approval Required**: Explicit approval needed for live trading
 - **API Keys Required**: Valid Binance API credentials
@@ -116,11 +140,81 @@ Signal(
 )
 ```
 
+## 🧪 Backtesting API
+
+The bot provides a comprehensive backtesting API with multi-timeframe support:
+
+### Multi-Timeframe Backtest Request
+```python
+{
+    "symbol": "BTCUSDT",
+    "strategy": "SIMPLE_TEST",
+    "start_date": "2024-01-01T00:00:00Z",
+    "end_date": "2024-01-07T00:00:00Z",
+    "timeframes": ["1h"],
+    "tf_roles": {"1h": "LTF"},
+    "initial_balance": 10000.0,
+    "commission": 0.001
+}
+```
+
+### Supported Timeframes
+- **1m**: 1 minute (high frequency)
+- **5m**: 5 minutes
+- **15m**: 15 minutes
+- **1h**: 1 hour (recommended for testing)
+- **4h**: 4 hours
+- **1d**: 1 day
+
+### Timeframe Roles
+- **HTF (Higher Timeframe)**: Used for trend analysis and major support/resistance
+- **LTF (Lower Timeframe)**: Used for entry/exit timing and detailed analysis
+
+### Backtest Results
+```python
+{
+    "id": "uuid-string",
+    "symbol": "BTCUSDT",
+    "strategy": "SIMPLE_TEST",
+    "start_date": "2024-01-01T00:00:00Z",
+    "end_date": "2024-01-07T00:00:00Z",
+    "initial_balance": 10000.0,
+    "final_balance": 10250.0,
+    "total_return": 0.025,
+    "max_drawdown": 0.015,
+    "sharpe_ratio": 1.2,
+    "total_trades": 15,
+    "winning_trades": 9,
+    "losing_trades": 6,
+    "win_rate": 0.6
+}
+```
+
+### Running Backtests
+```bash
+# Start the API server
+python -m src.startup
+
+# Create a backtest via API
+curl -X POST "http://localhost:8000/api/v1/backtests/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbol": "BTCUSDT",
+    "strategy": "SIMPLE_TEST",
+    "start_date": "2024-01-01T00:00:00Z",
+    "end_date": "2024-01-07T00:00:00Z",
+    "timeframes": ["1h"],
+    "tf_roles": {"1h": "LTF"},
+    "initial_balance": 10000.0
+  }'
+```
+
 ## 🛠️ Installation
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.9 or higher
 - Git
+- Virtual environment (recommended)
 
 ### Quick Start
 ```bash
@@ -202,7 +296,7 @@ smart-trading-bot/
 │   └── backtests/       # Backtesting engine
 ├── tests/               # Test suite
 ├── examples/            # Usage examples
-└── docs/               # Documentation
+└── web/                # Frontend application
 ```
 
 ## 🚀 Why This Structure?

@@ -201,7 +201,7 @@ Deterministic: random_seed, UTC.
 Implement package `src/strategies`:
 - base.py (abstract Backtrader.Strategy with generate_signals contract).
 - registry.py (auto-discovery of *.py strategies, versioning).
-- smc.py (baseline Smart Money strategy).
+- smc_signal.py (simplified, optimized Smart Money Concepts strategy).
 Signals: side, entry, SL, TP, confidence.
 Include synthetic data tests.
 
