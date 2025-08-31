@@ -42,6 +42,7 @@ class PairsService:
             'quote_asset': pair.quote_asset or '',
             'strategy': pair.strategy,
             'is_active': pair.is_active,
+            'exchange': 'binance_futures',  # Default exchange
             'created_at': pair.created_at.isoformat(),
             'updated_at': pair.updated_at.isoformat()
         }
@@ -50,8 +51,8 @@ class PairsService:
         query = """
             INSERT INTO pairs (
                 id, symbol, base_asset, quote_asset, strategy, 
-                is_active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                is_active, exchange, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
         await db.execute_insert(query, tuple(pair_data.values()))

@@ -5,6 +5,7 @@ Handles initialization of all components including logging, database, and config
 
 import asyncio
 import os
+import signal
 from pathlib import Path
 from typing import Optional
 
@@ -21,6 +22,7 @@ class TradingBotApp:
         self.settings_manager = None
         self.db_manager = None
         self._initialized = False
+        self._shutdown_event = asyncio.Event()
     
     async def initialize(self) -> None:
         """Initialize all application components."""
@@ -54,17 +56,25 @@ class TradingBotApp:
             return
         
         try:
+            # Signal shutdown
+            self._shutdown_event.set()
+            
             # Close database connections
             if self.db_manager:
                 await close_database()
             
-            self.logger.info("Trading bot application shutdown completed")
+            if self.logger:
+                self.logger.info("Trading bot application shutdown completed")
             
         except Exception as e:
             if self.logger:
                 self.logger.error("Error during shutdown", error=str(e))
         finally:
             self._initialized = False
+    
+    async def wait_for_shutdown(self) -> None:
+        """Wait for shutdown signal."""
+        await self._shutdown_event.wait()
     
     async def _setup_logging(self) -> None:
         """Setup structured logging configuration."""
@@ -163,7 +173,13 @@ async def shutdown_app() -> None:
 def create_startup_event_handler():
     """Create FastAPI startup event handler."""
     async def startup_event():
-        await initialize_app()
+        try:
+            await initialize_app()
+        except Exception as e:
+            # Log error but don't crash the app
+            import logging
+            logging.error(f"Startup failed: {e}")
+            raise
     
     return startup_event
 
@@ -171,6 +187,11 @@ def create_startup_event_handler():
 def create_shutdown_event_handler():
     """Create FastAPI shutdown event handler."""
     async def shutdown_event():
-        await shutdown_app()
+        try:
+            await shutdown_app()
+        except Exception as e:
+            # Log error but don't crash during shutdown
+            import logging
+            logging.error(f"Shutdown error: {e}")
     
     return shutdown_event

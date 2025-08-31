@@ -91,6 +91,24 @@ export interface BacktestConfig {
   timeframe?: string;
 }
 
+export interface TradeDetail {
+  entry_date: string;
+  exit_date: string;
+  entry_price: number;
+  exit_price: number;
+  size: number;
+  side: string;
+  pnl: number;
+  pnl_comm: number;
+  pnl_slippage: number;
+  return_pct: number;
+  exit_reason: string;
+  stop_loss?: number;
+  take_profit?: number;
+  duration_hours: number;
+  metadata: Record<string, any>;
+}
+
 export interface BacktestResult {
   id: string;
   pairs: string[];
@@ -111,6 +129,9 @@ export interface BacktestResult {
   completed_at?: string;
   parameters?: Record<string, any>;
   artifacts_path?: string;
+  
+  // Detailed trade information
+  trades: TradeDetail[];
   
   // Legacy support
   config?: BacktestConfig;

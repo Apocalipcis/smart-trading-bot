@@ -119,7 +119,7 @@ Get specific trading pair information.
   "symbol": "BTCUSDT",
   "base_asset": "BTC",
   "quote_asset": "USDT",
-  "strategy": "SMC",
+  "strategy": "SMCSignalStrategy",
   "is_active": true,
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
@@ -135,7 +135,7 @@ Add a new trading pair to the system.
   "symbol": "ETHUSDT",
   "base_asset": "ETH",
   "quote_asset": "USDT",
-  "strategy": "SMC"
+  "strategy": "SMCSignalStrategy"
 }
 ```
 
@@ -148,7 +148,7 @@ Update an existing trading pair.
   "symbol": "ETHUSDT",
   "base_asset": "ETH",
   "quote_asset": "USDT",
-  "strategy": "SMC",
+  "strategy": "SMCSignalStrategy",
   "is_active": true
 }
 ```
@@ -175,7 +175,7 @@ Get trading signals with optional filtering.
     {
       "id": "signal-123",
       "pair": "BTCUSDT",
-      "strategy": "SMC",
+      "strategy": "SMCSignalStrategy",
       "side": "long",
       "entry": 45000.0,
       "stop_loss": 44000.0,
@@ -204,7 +204,7 @@ Get specific signal details.
 {
   "id": "signal-123",
   "pair": "BTCUSDT",
-  "strategy": "SMC",
+  "strategy": "SMCSignalStrategy",
   "side": "long",
   "entry": 45000.0,
   "stop_loss": 44000.0,
@@ -249,7 +249,7 @@ Get list of backtest results.
     {
       "id": "backtest-123",
       "pair": "BTCUSDT",
-      "strategy": "SMC",
+      "strategy": "SMCSignalStrategy",
       "timeframe": "1m",
       "start_date": "2024-01-01T00:00:00Z",
       "end_date": "2024-01-15T00:00:00Z",
@@ -275,7 +275,7 @@ Create a new backtest.
 ```json
 {
   "pair": "BTCUSDT",
-  "strategy": "SMC",
+  "strategy": "SMCSignalStrategy",
   "timeframe": "1m",
   "start_date": "2024-01-01T00:00:00Z",
   "end_date": "2024-01-15T00:00:00Z",
@@ -305,7 +305,7 @@ Get detailed backtest results.
 {
   "id": "backtest-123",
   "pair": "BTCUSDT",
-  "strategy": "SMC",
+  "strategy": "SMCSignalStrategy",
   "timeframe": "1m",
   "start_date": "2024-01-01T00:00:00Z",
   "end_date": "2024-01-15T00:00:00Z",
@@ -812,7 +812,7 @@ signals = response.json()["items"]
 # Create backtest
 backtest_data = {
     "pair": "BTCUSDT",
-    "strategy": "SMC",
+    "strategy": "SMCSignalStrategy",
     "timeframe": "1m",
     "start_date": "2024-01-01T00:00:00Z",
     "end_date": "2024-01-15T00:00:00Z",

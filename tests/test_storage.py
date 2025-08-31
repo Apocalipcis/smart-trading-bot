@@ -249,7 +249,7 @@ class TestFileManager:
         result = {
             "id": "test_backtest_123",
             "pair": "BTCUSDT",
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "metrics": {
                 "total_return": 0.15,
                 "win_rate": 0.65,
@@ -267,7 +267,7 @@ class TestFileManager:
         assert loaded_result is not None
         assert loaded_result["id"] == "test_backtest_123"
         assert loaded_result["pair"] == "BTCUSDT"
-        assert loaded_result["strategy"] == "SMC"
+        assert loaded_result["strategy"] == "SMCSignalStrategy"
     
     def test_storage_stats(self, file_manager):
         """Test storage statistics."""

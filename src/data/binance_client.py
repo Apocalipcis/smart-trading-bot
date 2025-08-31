@@ -3,6 +3,7 @@ Binance USDT-M Futures client for REST and WebSocket operations.
 """
 import asyncio
 import json
+import logging
 import time
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
@@ -12,6 +13,8 @@ import websockets
 from pydantic import BaseModel, Field
 
 from .validators import BinanceValidator
+
+logger = logging.getLogger(__name__)
 
 
 class BinanceConfig(BaseModel):

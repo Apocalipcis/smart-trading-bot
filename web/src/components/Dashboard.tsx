@@ -16,6 +16,7 @@ const Dashboard: React.FC = () => {
   const [showAddPair, setShowAddPair] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
+  const [symbolError, setSymbolError] = useState<string>('');
 
   useEffect(() => {
     loadData();
@@ -89,14 +90,76 @@ const Dashboard: React.FC = () => {
     return () => eventSource.close();
   };
 
+  // Symbol validation function
+  const validateSymbol = (symbol: string): string => {
+    if (!symbol) return '';
+    
+    const trimmedSymbol = symbol.trim().toUpperCase();
+    
+    // Check if symbol is too short
+    if (trimmedSymbol.length < 4) {
+      return 'Symbol must be at least 4 characters long';
+    }
+    
+    // Check if symbol ends with common quote currencies
+    const validQuoteCurrencies = ['USDT', 'USDC', 'BUSD', 'BTC', 'ETH', 'BNB', 'ADA', 'DOT', 'LINK', 'LTC', 'XRP'];
+    const hasValidQuote = validQuoteCurrencies.some(quote => trimmedSymbol.endsWith(quote));
+    
+    if (!hasValidQuote) {
+      return 'Symbol must end with a valid quote currency (e.g., USDT, USDC, BTC)';
+    }
+    
+    // Check if symbol has at least 2 parts (base + quote)
+    if (trimmedSymbol.length < 6) {
+      return 'Symbol format should be like BTCUSDT, ETHUSDT, etc.';
+    }
+    
+    return '';
+  };
+
+  // Handle symbol change with validation
+  const handleSymbolChange = (symbol: string) => {
+    setNewPair(prev => ({ ...prev, symbol }));
+    const error = validateSymbol(symbol);
+    setSymbolError(error);
+  };
+
+  // Reset form function
+  const resetForm = () => {
+    setNewPair({ symbol: '', strategy: '' });
+    setSymbolError('');
+  };
+
   const handleAddPair = async () => {
+    // Validate symbol before making API call
+    const symbolValidationError = validateSymbol(newPair.symbol);
+    if (symbolValidationError) {
+      setSymbolError(symbolValidationError);
+      return;
+    }
+
     try {
       const pair = await apiClient.createPair(newPair);
       setPairs(prev => [...prev, pair]);
       setNewPair({ symbol: '', strategy: '' });
       setShowAddPair(false);
-    } catch (error) {
+      setSymbolError(''); // Clear any previous errors
+    } catch (error: any) {
       console.error('Failed to add pair:', error);
+      
+      // Handle specific API errors
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (typeof detail === 'string' && detail.includes('does not exist on Binance')) {
+          setSymbolError('This trading pair does not exist on Binance. Please check the symbol format.');
+        } else {
+          setSymbolError(detail);
+        }
+      } else if (error.message) {
+        setSymbolError(error.message);
+      } else {
+        setSymbolError('Failed to add trading pair. Please try again.');
+      }
     }
   };
 
@@ -295,7 +358,7 @@ const Dashboard: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">Active Pairs</span>
-              <span className="font-medium">{pairs?.filter(p => p.status === 'active').length || 0}</span>
+                              <span className="font-medium">{pairs?.filter(p => p.is_active).length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">Recent Signals</span>
@@ -343,11 +406,11 @@ const Dashboard: React.FC = () => {
                    </td>
                    <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      pair.status === 'active' 
+                      pair.is_active 
                         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     }`}>
-                      {pair.status}
+                      {pair.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
@@ -491,15 +554,31 @@ const Dashboard: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol (Name)
+                    Symbol (Trading Pair)
                   </label>
                   <input
                     type="text"
                     value={newPair.symbol}
-                    onChange={(e) => setNewPair(prev => ({ ...prev, symbol: e.target.value }))}
-                    className="input-field"
+                    onChange={(e) => handleSymbolChange(e.target.value)}
+                    className={`input-field ${symbolError ? 'border-red-500' : ''}`}
                     placeholder="BTCUSDT"
                   />
+                  {symbolError && <p className="text-red-500 text-xs mt-1">{symbolError}</p>}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Examples: BTCUSDT, ETHUSDT, ADAUSDT, DOTUSDT
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'DOTUSDT', 'LINKUSDT', 'LTCUSDT'].map((symbol) => (
+                      <button
+                        key={symbol}
+                        type="button"
+                        onClick={() => handleSymbolChange(symbol)}
+                        className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border"
+                      >
+                        {symbol}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -521,7 +600,10 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button
-                  onClick={() => setShowAddPair(false)}
+                  onClick={() => {
+                    setShowAddPair(false);
+                    resetForm();
+                  }}
                   className="btn-secondary"
                 >
                   Cancel
@@ -529,7 +611,7 @@ const Dashboard: React.FC = () => {
                 <button
                   onClick={handleAddPair}
                   className="btn-primary"
-                  disabled={!newPair.symbol || !newPair.strategy}
+                  disabled={!newPair.symbol || !newPair.strategy || !!symbolError}
                 >
                   Add Trading Pair
                 </button>

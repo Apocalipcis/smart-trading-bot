@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Trash2, Eye, BarChart3, AlertTriangle, X, Plus, Minus, Download, RefreshCw } from 'lucide-react';
+import { Play, Trash2, Eye, BarChart3, AlertTriangle, X, Plus, Minus, Download, RefreshCw, Calendar } from 'lucide-react';
 import { BacktestConfig, BacktestResult, TradingPair, TimeframeRole, StrategyMetadata, AvailableTimeframes } from '../types/api';
 import apiClient from '../services/api';
 
@@ -74,6 +74,55 @@ const Backtests: React.FC = () => {
       max_drawdown: backtest.max_drawdown || 0,
       sharpe_ratio: backtest.sharpe_ratio || 0
     };
+  };
+
+  // Quick date selection utility functions
+  const getDateDaysAgo = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString().split('T')[0];
+  };
+
+  const getTodayDate = (): string => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const handleQuickDateSelect = (days: number) => {
+    const startDate = getDateDaysAgo(days);
+    const endDate = getTodayDate();
+    setFormData(prev => ({
+      ...prev,
+      start_date: startDate,
+      end_date: endDate
+    }));
+  };
+
+  const handleTodaySelect = () => {
+    const today = getTodayDate();
+    setFormData(prev => ({
+      ...prev,
+      start_date: today,
+      end_date: today
+    }));
+  };
+
+  const handleResetDates = () => {
+    setFormData(prev => ({
+      ...prev,
+      start_date: '',
+      end_date: ''
+    }));
+  };
+
+  const getSelectedPeriodText = (): string => {
+    if (formData.start_date && formData.end_date) {
+      const start = new Date(formData.start_date);
+      const end = new Date(formData.end_date);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} period`;
+    }
+    return '';
   };
 
   useEffect(() => {
@@ -628,6 +677,54 @@ const Backtests: React.FC = () => {
                   </div>
                 )}
 
+                {/* Quick Date Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Quick Date Selection
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTodaySelect}
+                      className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-green-50 hover:border-green-300 hover:text-green-700 dark:hover:bg-green-900/20 dark:hover:border-green-600 dark:hover:text-green-400 transition-all duration-200"
+                      title="Today only"
+                    >
+                      Today
+                    </button>
+                    {[7, 14, 21, 30].map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => handleQuickDateSelect(days)}
+                        className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:border-blue-600 dark:hover:text-blue-400 transition-all duration-200"
+                        title={`Last ${days} day${days > 1 ? 's' : ''}`}
+                      >
+                        {days} Day{days > 1 ? 's' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.start_date && formData.end_date && (
+                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          <span className="font-medium">{getSelectedPeriodText()}</span>
+                          <span className="mx-2">•</span>
+                          <span>{formData.start_date} to {formData.end_date}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleResetDates}
+                          className="px-3 py-1 text-sm font-medium rounded-md border border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 hover:bg-red-50 hover:border-red-300 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:border-red-600 dark:hover:text-red-400 transition-all duration-200"
+                          title="Clear dates"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -785,35 +882,105 @@ const Backtests: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Metrics */}
-                {getBacktestMetrics(selectedBacktest) && (
-                  <div>
-                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">Performance Metrics</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {getBacktestMetrics(selectedBacktest).total_return >= 0 ? '+' : ''}{getBacktestMetrics(selectedBacktest).total_return.toFixed(2)}%
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Total Return</div>
+                {/* Performance Metrics */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">Performance Metrics</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-3 rounded">
+                      <div className="text-sm text-gray-600">Total Return</div>
+                      <div className={`text-lg font-semibold ${selectedBacktest.total_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {selectedBacktest.total_return >= 0 ? '+' : ''}{selectedBacktest.total_return.toFixed(2)}%
                       </div>
-                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {getBacktestMetrics(selectedBacktest).win_rate.toFixed(1)}%
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <div className="text-sm text-gray-600">Win Rate</div>
+                      <div className="text-lg font-semibold">{selectedBacktest.win_rate.toFixed(1)}%</div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <div className="text-sm text-gray-600">Total Trades</div>
+                      <div className="text-lg font-semibold">{selectedBacktest.total_trades}</div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <div className="text-sm text-gray-600">Max Drawdown</div>
+                      <div className="text-lg font-semibold text-red-600">{selectedBacktest.max_drawdown.toFixed(2)}%</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Trade History */}
+                {selectedBacktest.trades && selectedBacktest.trades.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3">Trade History</h3>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {selectedBacktest.trades.map((trade, index) => (
+                        <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                trade.side === 'long' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {trade.side.toUpperCase()}
+                              </span>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                trade.exit_reason === 'Take Profit' ? 'bg-blue-100 text-blue-800' :
+                                trade.exit_reason === 'Stop Loss' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {trade.exit_reason}
+                              </span>
+                            </div>
+                            <span className={`text-sm font-medium ${
+                              trade.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)} ({trade.return_pct >= 0 ? '+' : ''}{trade.return_pct.toFixed(2)}%)
+                            </span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-600">Entry:</span> ${trade.entry_price.toFixed(2)}
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Exit:</span> ${trade.exit_price.toFixed(2)}
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Stop Loss:</span> ${trade.stop_loss?.toFixed(2) || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Take Profit:</span> ${trade.take_profit?.toFixed(2) || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Size:</span> {Math.abs(trade.size).toFixed(4)}
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Duration:</span> {trade.duration_hours.toFixed(1)}h
+                            </div>
+                          </div>
+                          
+                          {trade.metadata && Object.keys(trade.metadata).length > 0 && (
+                            <div className="mt-2 pt-2 border-t">
+                              <div className="text-xs text-gray-600 mb-1">Signal Details:</div>
+                              <div className="text-xs space-x-2">
+                                {Object.entries(trade.metadata).map(([key, value]) => (
+                                  <span key={key} className="inline-block bg-gray-200 px-2 py-1 rounded">
+                                    {key}: {typeof value === 'number' ? value.toFixed(2) : value}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Win Rate</div>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {getBacktestMetrics(selectedBacktest).total_trades}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Total Trades</div>
-                      </div>
-                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {getBacktestMetrics(selectedBacktest).max_drawdown.toFixed(2)}%
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Max Drawdown</div>
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No Trades Message */}
+                {(!selectedBacktest.trades || selectedBacktest.trades.length === 0) && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3">Trade History</h3>
+                    <div className="text-gray-500 text-center py-4">
+                      No trades were executed during this backtest period.
                     </div>
                   </div>
                 )}

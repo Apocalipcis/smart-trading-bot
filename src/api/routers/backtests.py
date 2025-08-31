@@ -1,11 +1,17 @@
 """Backtests router for backtest management."""
 
+import logging
 from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
 
+logger = logging.getLogger(__name__)
+
 from ..schemas import APIResponse, BacktestRequest, BacktestResult, PaginatedResponse
+from ...backtests.runner import BacktestRunner
+from ...backtests.models import BacktestConfig
+from ...backtests.preparation import DataPreparationError
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
@@ -54,7 +60,7 @@ async def get_backtests(
 async def get_backtest(backtest_id: str) -> BacktestResult:
     """Get a specific backtest result by ID."""
     for backtest in _backtest_results:
-        if str(backtest.id) == backtest_id:
+        if str(backtest.id) == str(backtest_id):
             return backtest
     
     raise HTTPException(
@@ -135,57 +141,114 @@ async def create_backtest(backtest_request: BacktestRequest) -> BacktestResult:
     # Add strategy validation warnings to deprecation warnings
     deprecation_warnings.extend(strategy_validation["warnings"])
     
-    # TODO: This is a placeholder implementation
-    # In the actual implementation, this would:
-    # 1. Validate the request
-    # 2. Run the backtest using Backtrader
-    # 3. Calculate metrics
-    # 4. Save results and artifacts
-    
-    # Placeholder metrics calculation
-    import random
-    
-    # Simulate backtest results
-    initial_balance = backtest_request.initial_balance
-    final_balance = initial_balance * (1 + random.uniform(-0.1, 0.3))  # -10% to +30%
-    total_return = ((final_balance - initial_balance) / initial_balance) * 100
-    
-    total_trades = random.randint(10, 100)
-    profitable_trades = int(total_trades * random.uniform(0.3, 0.7))
-    win_rate = (profitable_trades / total_trades) * 100
-    
-    max_drawdown = random.uniform(5, 25)
-    sharpe_ratio = random.uniform(-1, 2)
-    
-    # Create backtest result
-    backtest_result = BacktestResult(
-        id=backtest_id,
-        pairs=backtest_request.pairs,
-        strategy=backtest_request.strategy,
-        timeframes=backtest_request.timeframes,
-        tf_roles=backtest_request.tf_roles,
-        start_date=backtest_request.start_date,
-        end_date=backtest_request.end_date,
-        initial_balance=initial_balance,
-        final_balance=final_balance,
-        total_return=total_return,
-        win_rate=win_rate,
-        total_trades=total_trades,
-        profitable_trades=profitable_trades,
-        max_drawdown=max_drawdown,
-        sharpe_ratio=sharpe_ratio,
-        parameters=backtest_request.parameters,
-        artifacts_path=f"/data/artifacts/{backtest_id}",
-        # Legacy support
-        pair=backtest_request.pairs[0] if backtest_request.pairs else None,
-        timeframe=backtest_request.timeframes[0] if backtest_request.timeframes else None,
-        initial_capital=initial_balance
-    )
-    
-    # Add to storage
-    _backtest_results.append(backtest_result)
-    
-    return backtest_result
+    try:
+        # Get the primary symbol for the backtest
+        primary_symbol = backtest_request.pairs[0] if backtest_request.pairs else backtest_request.pair
+        if not primary_symbol:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No trading pair specified"
+            )
+        
+        # Get the primary timeframes
+        primary_timeframes = backtest_request.timeframes or [backtest_request.timeframe]
+        if not primary_timeframes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No timeframes specified"
+            )
+        
+        # Create BacktestConfig from request
+        backtest_config = BacktestConfig(
+            symbol=primary_symbol,
+            strategy_name=backtest_request.strategy,
+            strategy_params=backtest_request.parameters,
+            timeframes=primary_timeframes,
+            tf_roles=backtest_request.tf_roles,
+            timeframe=backtest_request.timeframe,  # Legacy support
+            start_date=backtest_request.start_date,
+            end_date=backtest_request.end_date,
+            initial_cash=backtest_request.initial_balance,
+            commission=backtest_request.commission or 0.001,
+            slippage=backtest_request.slippage or 0.0001,
+            leverage=backtest_request.leverage
+        )
+        
+        # Run the backtest using BacktestRunner
+        runner = BacktestRunner()
+        backtest_result = await runner.run_backtest(backtest_config)
+        
+        # Debug logging for trades
+        logger.info(f"Backtest result trades: {getattr(backtest_result, 'trades', 'No trades attribute')}")
+        logger.info(f"Backtest result has trades: {hasattr(backtest_result, 'trades')}")
+        if hasattr(backtest_result, 'trades') and backtest_result.trades:
+            logger.info(f"Number of trades: {len(backtest_result.trades)}")
+            logger.info(f"First trade: {backtest_result.trades[0] if backtest_result.trades else 'Empty'}")
+        
+        # Convert BacktestResult to API BacktestResult format
+        api_result = BacktestResult(
+            id=backtest_id,  # Use the UUID generated at the start
+            pairs=backtest_request.pairs or [primary_symbol],
+            strategy=backtest_request.strategy,
+            timeframes=primary_timeframes,
+            tf_roles=backtest_request.tf_roles,
+            start_date=backtest_request.start_date,
+            end_date=backtest_request.end_date,
+            initial_balance=backtest_request.initial_balance,
+            final_balance=backtest_result.final_value,
+            total_return=backtest_result.total_return,
+            win_rate=backtest_result.win_rate,
+            total_trades=backtest_result.total_trades,
+            profitable_trades=int(backtest_result.total_trades * (backtest_result.win_rate / 100)),
+            max_drawdown=backtest_result.max_drawdown,
+            sharpe_ratio=backtest_result.sharpe_ratio,
+            profit_factor=backtest_result.profit_factor if hasattr(backtest_result, 'profit_factor') else 1.0,
+            avg_trade=backtest_result.avg_trade if hasattr(backtest_result, 'avg_trade') else 0.0,
+            max_consecutive_losses=backtest_result.max_consecutive_losses if hasattr(backtest_result, 'max_consecutive_losses') else 0,
+            parameters=backtest_request.parameters,
+            artifacts_path=f"/data/artifacts/{backtest_result.id}",
+            # Include detailed trade information
+            trades=backtest_result.trades if hasattr(backtest_result, 'trades') else [],
+            # Legacy support
+            pair=primary_symbol,
+            timeframe=primary_timeframes[0] if primary_timeframes else None,
+            initial_capital=backtest_request.initial_balance,
+            # Additional fields from backtest result
+            created_at=backtest_result.start_time,
+            updated_at=backtest_result.end_time,
+            status=backtest_result.status,
+            error_message=backtest_result.error_message
+        )
+        
+        # Debug logging for final API result
+        logger.info(f"API result trades: {getattr(api_result, 'trades', 'No trades attribute')}")
+        logger.info(f"API result has trades: {hasattr(api_result, 'trades')}")
+        if hasattr(api_result, 'trades') and api_result.trades:
+            logger.info(f"API result number of trades: {len(api_result.trades)}")
+        
+        # Add to storage
+        _backtest_results.append(api_result)
+        
+        return api_result
+        
+    except DataPreparationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Data preparation failed",
+                "error": str(e),
+                "warnings": deprecation_warnings
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": "Backtest execution failed",
+                "error": str(e),
+                "warnings": deprecation_warnings
+            }
+        )
 
 
 @router.delete("/{backtest_id}", response_model=APIResponse)
@@ -308,19 +371,47 @@ async def get_backtest_detailed(backtest_id: str):
 @router.get("/available/strategies")
 async def get_available_strategies():
     """Get list of available strategies for backtesting."""
-    # TODO: This would query the strategy registry
-    return [
-        {
-            "name": "SMC",
-            "description": "Smart Money Concepts Strategy",
-            "version": "1.0.0",
-            "parameters": {
-                "rsi_period": {"type": "int", "default": 14, "min": 1, "max": 50},
-                "ma_period": {"type": "int", "default": 20, "min": 5, "max": 200},
-                "stop_loss_pct": {"type": "float", "default": 2.0, "min": 0.5, "max": 10.0}
+    try:
+        # Import strategies directly from the strategies module
+        from .strategies import _get_strategies_from_registry
+        strategies = _get_strategies_from_registry()
+        
+        # Convert to backtest format
+        backtest_strategies = []
+        for strategy in strategies:
+            backtest_strategies.append({
+                "name": strategy.name,
+                "description": strategy.description,
+                "version": strategy.version,
+                "parameters": strategy.parameters
+            })
+        
+        return backtest_strategies
+    except Exception as e:
+        logger.warning(f"Could not load strategies from registry: {e}")
+        # Fallback to basic strategies
+        return [
+            {
+                "name": "SMC",
+                "description": "Smart Money Concepts Strategy",
+                "version": "1.0.0",
+                "parameters": {
+                    "rsi_period": {"type": "int", "default": 14, "min": 1, "max": 50},
+                    "ma_period": {"type": "int", "default": 20, "min": 5, "max": 200},
+                    "stop_loss_pct": {"type": "float", "default": 2.0, "min": 0.5, "max": 10.0}
+                }
+            },
+            {
+                "name": "SIMPLE_TEST",
+                "description": "Simple test strategy for basic functionality validation",
+                "version": "1.0.0",
+                "parameters": {
+                    "ma_fast": {"type": "int", "default": 10, "min": 5, "max": 50},
+                    "ma_slow": {"type": "int", "default": 20, "min": 10, "max": 100},
+                    "stop_loss_pct": {"type": "float", "default": 1.0, "min": 0.1, "max": 5.0}
+                }
             }
-        }
-    ]
+        ]
 
 
 @router.get("/available/timeframes")
@@ -345,11 +436,12 @@ async def _validate_strategy_requirements(
 ) -> dict:
     """Validate that timeframe role assignments meet strategy requirements."""
     # Import here to avoid circular imports
-    from .strategies import STRATEGIES_METADATA
+    from .strategies import _get_strategies_from_registry
     
     # Find strategy
     strategy = None
-    for s in STRATEGIES_METADATA:
+    strategies = _get_strategies_from_registry()
+    for s in strategies:
         if s.name.upper() == strategy_name.upper() and s.is_active:
             strategy = s
             break

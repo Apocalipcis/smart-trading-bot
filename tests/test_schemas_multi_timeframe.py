@@ -159,7 +159,7 @@ class TestBacktestRequestMultiTimeframe:
     def test_valid_multi_timeframe_request(self):
         """Test creating a valid multi-timeframe backtest request."""
         request = BacktestRequest(
-            strategy="SMCStrategy",
+            strategy="SMCSignalStrategy",
             pairs=["BTCUSDT"],
             timeframes=["1h", "15m"],
             tf_roles={"1h": TimeframeRole.HTF, "15m": TimeframeRole.LTF},
@@ -167,7 +167,7 @@ class TestBacktestRequestMultiTimeframe:
             end_date="2024-01-31",
             initial_capital=10000.0
         )
-        assert request.strategy == "SMCStrategy"
+        assert request.strategy == "SMCSignalStrategy"
         assert request.pairs == ["BTCUSDT"]
         assert request.timeframes == ["1h", "15m"]
         assert request.tf_roles == {"1h": TimeframeRole.HTF, "15m": TimeframeRole.LTF}
@@ -175,7 +175,7 @@ class TestBacktestRequestMultiTimeframe:
     def test_backward_compatibility_legacy_fields(self):
         """Test that legacy fields are accepted for backward compatibility."""
         request = BacktestRequest(
-            strategy="SMCStrategy",
+            strategy="SMCSignalStrategy",
             start_date="2024-01-01",
             end_date="2024-01-31",
             initial_capital=10000.0,
@@ -193,7 +193,7 @@ class TestBacktestRequestMultiTimeframe:
         """Test that empty timeframes list is rejected."""
         with pytest.raises(ValidationError) as exc_info:
             BacktestRequest(
-                strategy="SMCStrategy",
+                strategy="SMCSignalStrategy",
                 pairs=["BTCUSDT"],
                 timeframes=[],
                 tf_roles={},
@@ -207,7 +207,7 @@ class TestBacktestRequestMultiTimeframe:
         """Test that duplicate timeframes are rejected."""
         with pytest.raises(ValidationError) as exc_info:
             BacktestRequest(
-                strategy="SMCStrategy",
+                strategy="SMCSignalStrategy",
                 pairs=["BTCUSDT"],
                 timeframes=["1h", "1h"],
                 tf_roles={"1h": TimeframeRole.LTF},
@@ -221,7 +221,7 @@ class TestBacktestRequestMultiTimeframe:
         """Test that invalid timeframe format is rejected."""
         with pytest.raises(ValidationError) as exc_info:
             BacktestRequest(
-                strategy="SMCStrategy",
+                strategy="SMCSignalStrategy",
                 pairs=["BTCUSDT"],
                 timeframes=["invalid"],
                 tf_roles={"invalid": TimeframeRole.LTF},
@@ -235,7 +235,7 @@ class TestBacktestRequestMultiTimeframe:
         """Test that empty pairs list is rejected."""
         with pytest.raises(ValidationError) as exc_info:
             BacktestRequest(
-                strategy="SMCStrategy",
+                strategy="SMCSignalStrategy",
                 pairs=[],
                 timeframes=["1h"],
                 tf_roles={"1h": TimeframeRole.LTF},
@@ -249,7 +249,7 @@ class TestBacktestRequestMultiTimeframe:
         """Test that duplicate pairs are rejected."""
         with pytest.raises(ValidationError) as exc_info:
             BacktestRequest(
-                strategy="SMCStrategy",
+                strategy="SMCSignalStrategy",
                 pairs=["BTCUSDT", "BTCUSDT"],
                 timeframes=["1h"],
                 tf_roles={"1h": TimeframeRole.LTF},
@@ -281,7 +281,7 @@ class TestBacktestResultMultiTimeframe:
         """Test creating a valid multi-timeframe backtest result."""
         result = BacktestResult(
             id="550e8400-e29b-41d4-a716-446655440000",  # Valid UUID
-            strategy="SMCStrategy",
+            strategy="SMCSignalStrategy",
             pairs=["BTCUSDT"],
             timeframes=["1h", "15m"],
             tf_roles={"1h": TimeframeRole.HTF, "15m": TimeframeRole.LTF},
@@ -295,9 +295,12 @@ class TestBacktestResultMultiTimeframe:
             profitable_trades=60,
             max_drawdown=0.05,
             sharpe_ratio=1.2,
+            profit_factor=1.5,
+            avg_trade=10.0,
+            max_consecutive_losses=3,
             status="completed"
         )
-        assert result.strategy == "SMCStrategy"
+        assert result.strategy == "SMCSignalStrategy"
         assert result.pairs == ["BTCUSDT"]
         assert result.timeframes == ["1h", "15m"]
         assert result.tf_roles == {"1h": TimeframeRole.HTF, "15m": TimeframeRole.LTF}
@@ -306,7 +309,7 @@ class TestBacktestResultMultiTimeframe:
         """Test that legacy fields are accepted for backward compatibility."""
         result = BacktestResult(
             id="550e8400-e29b-41d4-a716-446655440000",  # Valid UUID
-            strategy="SMCStrategy",
+            strategy="SMCSignalStrategy",
             pairs=["BTCUSDT"],
             timeframes=["1h"],
             tf_roles={"1h": TimeframeRole.LTF},
@@ -320,6 +323,9 @@ class TestBacktestResultMultiTimeframe:
             profitable_trades=60,
             max_drawdown=0.05,
             sharpe_ratio=1.2,
+            profit_factor=1.5,
+            avg_trade=10.0,
+            max_consecutive_losses=3,
             status="completed",
             # Legacy fields
             pair="BTCUSDT",
@@ -400,7 +406,7 @@ class TestStrategyInfo:
     def test_valid_strategy_info(self):
         """Test creating a valid StrategyInfo."""
         info = StrategyInfo(
-            name="SMCStrategy",
+            name="SMCSignalStrategy",
             version="1.0.0",
             description="Smart Money Concepts strategy",
             required_roles=[TimeframeRole.HTF, TimeframeRole.LTF],
@@ -415,7 +421,7 @@ class TestStrategyInfo:
             parameters={"risk_percent": 2.0, "leverage": 10},
             is_active=True
         )
-        assert info.name == "SMCStrategy"
+        assert info.name == "SMCSignalStrategy"
         assert len(info.required_roles) == 2
         assert len(info.role_constraints) == 1
         assert info.parameters["risk_percent"] == 2.0

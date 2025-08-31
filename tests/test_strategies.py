@@ -10,7 +10,7 @@ This module tests:
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 
 from src.strategies.base import Signal, BaseStrategy
 from src.strategies.registry import StrategyRegistry, StrategyInfo
@@ -110,7 +110,9 @@ class TestStrategyRegistry:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.registry = StrategyRegistry()
+        # Mock the discover_strategies method to prevent auto-discovery during tests
+        with patch.object(StrategyRegistry, 'discover_strategies', return_value=[]):
+            self.registry = StrategyRegistry()
     
     def test_registry_initialization(self):
         """Test registry initialization."""

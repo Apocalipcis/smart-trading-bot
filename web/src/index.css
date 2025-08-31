@@ -25,6 +25,10 @@
     @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
   
+  .btn-sm {
+    @apply py-1.5 px-3 text-sm;
+  }
+  
   .card {
     @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700;
   }
