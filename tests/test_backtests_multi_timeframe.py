@@ -22,12 +22,12 @@ class TestMultiTimeframeBacktestCreation:
     def test_valid_multi_timeframe_backtest(self):
         """Test creating a valid multi-timeframe backtest."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SimpleTestStrategy",  # Use SimpleTestStrategy which only requires LTF role
             "pairs": ["BTCUSDT"],
-            "timeframes": ["1h", "15m"],
-            "tf_roles": {"1h": "HTF", "15m": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "timeframes": ["1h"],
+            "tf_roles": {"1h": "LTF"},
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-07T00:00:00Z",  # Match available data range
             "initial_balance": 10000.0
         }
         
@@ -44,12 +44,12 @@ class TestMultiTimeframeBacktestCreation:
     def test_multi_timeframe_backtest_with_parameters(self):
         """Test creating a multi-timeframe backtest with strategy parameters."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["1h", "15m"],
             "tf_roles": {"1h": "HTF", "15m": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0,
             "parameters": {
                 "risk_percent": 2.0,
@@ -67,12 +67,12 @@ class TestMultiTimeframeBacktestCreation:
     def test_multi_timeframe_backtest_multiple_pairs(self):
         """Test creating a multi-timeframe backtest with multiple pairs."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT", "ETHUSDT"],
             "timeframes": ["1h", "15m"],
             "tf_roles": {"1h": "HTF", "15m": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -90,11 +90,11 @@ class TestBackwardCompatibility:
     def test_legacy_single_timeframe_request(self):
         """Test that legacy single-timeframe requests still work."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pair": "BTCUSDT",  # Legacy field
             "timeframe": "1h",   # Legacy field
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_capital": 10000.0
         }
         
@@ -110,11 +110,11 @@ class TestBackwardCompatibility:
     def test_legacy_request_with_initial_capital(self):
         """Test legacy request with initial_capital field."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pair": "BTCUSDT",
             "timeframe": "1h",
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_capital": 10000.0  # Legacy field
         }
         
@@ -128,14 +128,14 @@ class TestBackwardCompatibility:
     def test_mixed_legacy_and_new_fields(self):
         """Test request with both legacy and new fields."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],  # New field
             "timeframes": ["1h"],   # New field
             "tf_roles": {"1h": "LTF"},  # New field
             "pair": "BTCUSDT",      # Legacy field
             "timeframe": "1h",      # Legacy field
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_capital": 10000.0
         }
         
@@ -152,12 +152,12 @@ class TestStrategyValidation:
     def test_strategy_validation_failure_missing_roles(self):
         """Test that backtest creation fails when strategy requirements are not met."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["1h"],  # Missing LTF timeframe
             "tf_roles": {"1h": "HTF"},  # Missing LTF role
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -172,12 +172,12 @@ class TestStrategyValidation:
     def test_strategy_validation_failure_constraint_violation(self):
         """Test that backtest creation fails when timeframe constraints are violated."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["1m", "5m"],  # Both too small for HTF role
             "tf_roles": {"1m": "HTF", "5m": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -192,12 +192,12 @@ class TestStrategyValidation:
     def test_strategy_validation_success(self):
         """Test that backtest creation succeeds with valid strategy requirements."""
         request_data = {
-            "strategy": "SIMPLE_TEST",  # Only requires LTF role
+            "strategy": "SimpleTestStrategy",  # Only requires LTF role
             "pairs": ["BTCUSDT"],
             "timeframes": ["15m"],
             "tf_roles": {"15m": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -215,12 +215,12 @@ class TestValidationErrors:
     def test_empty_timeframes_validation(self):
         """Test that empty timeframes list is rejected."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": [],
             "tf_roles": {},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -233,7 +233,7 @@ class TestValidationErrors:
     def test_duplicate_timeframes_validation(self):
         """Test that duplicate timeframes are rejected."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["1h", "1h"],
             "tf_roles": {"1h": "HTF"},
@@ -251,12 +251,12 @@ class TestValidationErrors:
     def test_invalid_timeframe_format(self):
         """Test that invalid timeframe format is rejected."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["invalid"],
             "tf_roles": {"invalid": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -269,12 +269,12 @@ class TestValidationErrors:
     def test_empty_pairs_validation(self):
         """Test that empty pairs list is rejected."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": [],
             "timeframes": ["1h"],
             "tf_roles": {"1h": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -287,12 +287,12 @@ class TestValidationErrors:
     def test_duplicate_pairs_validation(self):
         """Test that duplicate pairs are rejected."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT", "BTCUSDT"],
             "timeframes": ["1h"],
             "tf_roles": {"1h": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -331,8 +331,8 @@ class TestErrorHandling:
             "pairs": ["BTCUSDT"],
             "timeframes": ["1h"],
             "tf_roles": {"1h": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
@@ -347,12 +347,12 @@ class TestErrorHandling:
     def test_invalid_date_range(self):
         """Test handling of invalid date range."""
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["1h"],
             "tf_roles": {"1h": "LTF"},
-            "start_date": "2024-01-31",  # End date before start date
-            "end_date": "2024-01-01",
+            "start_date": "2024-01-31T23:59:59Z",  # End date before start date
+            "end_date": "2024-01-01T00:00:00Z",
             "initial_balance": 10000.0
         }
         
@@ -366,7 +366,7 @@ class TestErrorHandling:
         """Test handling of malformed request data."""
         # Missing required fields
         request_data = {
-            "strategy": "SMC",
+            "strategy": "SMCSignalStrategy",
             # Missing pairs, timeframes, etc.
         }
         
@@ -393,12 +393,12 @@ class TestBacktestRetrieval:
         """Test getting a specific backtest result."""
         # First create a backtest
         request_data = {
-            "strategy": "SIMPLE_TEST",
+            "strategy": "SimpleTestStrategy",
             "pairs": ["BTCUSDT"],
             "timeframes": ["15m"],
             "tf_roles": {"15m": "LTF"},
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-01-31T23:59:59Z",
             "initial_balance": 10000.0
         }
         
