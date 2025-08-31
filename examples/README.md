@@ -1,14 +1,15 @@
 # Examples
 
-This directory contains demonstration scripts for the smart-trading-bot package, showcasing all major features including the simulation engine.
+This directory contains demonstration scripts for the smart-trading-bot package, showcasing all major features including the simulation engine, backtesting, and data layer.
 
-## Running the Examples
+## 🚀 Quick Start
 
-### Option 1: Direct Python Execution
+### Option 1: Direct Python Execution (Recommended)
 ```bash
 # From the project root directory
 python examples/backtest_demo.py
 python examples/simulation_demo.py
+python examples/strategy_demo.py
 ```
 
 ### Option 2: As a Module
@@ -17,7 +18,7 @@ python examples/simulation_demo.py
 python -m examples
 ```
 
-### Option 3: Install in Development Mode (Recommended)
+### Option 3: Install in Development Mode
 ```bash
 # Install the package in development mode to resolve import issues
 python install_dev.py
@@ -26,7 +27,7 @@ python install_dev.py
 python examples/backtest_demo.py
 ```
 
-## Available Examples
+## 📚 Available Examples
 
 ### 1. backtest_demo.py
 Demonstrates the core functionality of the backtests package:
@@ -42,7 +43,7 @@ Demonstrates the core functionality of the backtests package:
 - Data integrity checking
 - Data quality issue detection and fixing
 
-### 2. simulation_demo.py (NEW)
+### 2. simulation_demo.py
 Demonstrates the complete simulation engine functionality:
 
 - **Simulation Engine Setup**: Initialize and configure the simulation engine
@@ -59,22 +60,7 @@ Demonstrates the complete simulation engine functionality:
 - Performance metrics calculation
 - Position management examples
 
-### 3. data_layer_demo.py
-Demonstrates the data layer functionality:
-
-- **Binance Client**: REST API and WebSocket connections
-- **Data Validation**: Exchange rules and constraints
-- **Rate Limiting**: API rate limit management
-- **WebSocket Streaming**: Real-time data feeds
-
-**What You'll See:**
-- Exchange information retrieval
-- Historical data download
-- Real-time price streaming
-- Data validation examples
-- Rate limiting demonstrations
-
-### 4. strategy_demo.py
+### 3. strategy_demo.py
 Demonstrates the trading strategy system:
 
 - **Strategy Registry**: Auto-discovery of strategy files
@@ -88,6 +74,21 @@ Demonstrates the trading strategy system:
 - Sample signal generation
 - Custom strategy examples
 - Signal validation
+
+### 4. data_layer_demo.py
+Demonstrates the data layer functionality:
+
+- **Binance Client**: REST API and WebSocket connections
+- **Data Validation**: Exchange rules and constraints
+- **Rate Limiting**: API rate limit management
+- **WebSocket Streaming**: Real-time data feeds
+
+**What You'll See:**
+- Exchange information retrieval
+- Historical data download
+- Real-time price streaming
+- Data validation examples
+- Rate limiting demonstrations
 
 ### 5. download_data_demo.py
 Demonstrates historical data download and management:
@@ -103,7 +104,7 @@ Demonstrates historical data download and management:
 - Data quality checks
 - File organization examples
 
-## Quick Start Guide
+## 🎯 Quick Start Guide
 
 ### 1. Setup Environment
 ```bash
@@ -143,7 +144,7 @@ run_basic_simulation()
 "
 ```
 
-## Example Outputs
+## 📊 Example Outputs
 
 ### Simulation Demo Output
 ```
@@ -178,7 +179,7 @@ run_basic_simulation()
 📊 Backtest Results:
 - Strategy: SMC
 - Pair: BTCUSDT
-- Timeframe: 1m
+- Timeframe: 1h
 - Total Return: 15.5%
 - Win Rate: 68%
 - Total Trades: 45
@@ -191,7 +192,7 @@ run_basic_simulation()
 ✅ Backtest Demo Completed Successfully!
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Setup
 Create a `.env` file in the project root:
@@ -231,14 +232,14 @@ SIMULATION_CONFIG = {
 # backtest_demo.py configuration
 BACKTEST_CONFIG = {
     "pair": "BTCUSDT",
-    "strategy": "SMC",
-    "timeframe": "1m",
+    "strategy": "SMCSignalStrategy",
+    "timeframe": "1h",
     "start_date": "2024-01-01",
     "end_date": "2024-01-15"
 }
 ```
 
-## Troubleshooting
+## 🚨 Troubleshooting
 
 ### Common Issues
 
@@ -302,7 +303,7 @@ run_basic_simulation()
 "
 ```
 
-## Advanced Usage
+## 🔧 Advanced Usage
 
 ### Custom Example Development
 Create your own examples:
@@ -354,9 +355,7 @@ if __name__ == "__main__":
     run_integration_demo()
 ```
 
-## Performance Testing
-
-### Benchmark Examples
+### Performance Testing
 Test performance with different configurations:
 
 ```python
@@ -379,7 +378,7 @@ if __name__ == "__main__":
     benchmark_simulation()
 ```
 
-## Next Steps
+## 📋 Next Steps
 
 After running the examples, you can:
 
@@ -406,15 +405,15 @@ After running the examples, you can:
    - Test with simulation engine
    - Backtest for validation
 
-## Requirements
+## 📋 Requirements
 
-- Python 3.8+
+- Python 3.9+
 - Virtual environment activated
 - Required packages installed (pandas, numpy, backtrader, etc.)
 - Internet connection for data access
 - Sufficient disk space for data storage
 
-## Support
+## 🆘 Support
 
 For issues with examples:
 
@@ -424,7 +423,7 @@ For issues with examples:
 4. Create a minimal reproduction of your issue
 5. Submit an issue with detailed error information
 
-## Changelog
+## 📝 Changelog
 
 ### v1.0.0
 - Added simulation_demo.py
@@ -433,3 +432,4 @@ For issues with examples:
 - Added performance testing examples
 - Added integration examples
 - Improved documentation and configuration
+- Streamlined content and structure

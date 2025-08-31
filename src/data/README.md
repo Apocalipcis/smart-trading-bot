@@ -1,269 +1,530 @@
-# Data Layer
+# Data Layer Package
 
-The data layer provides comprehensive data handling for Binance USDT-M Futures, including REST API access, WebSocket streaming, and Backtrader integration.
+A comprehensive data layer for the Smart Trading Bot that provides real-time and historical data from Binance Futures with robust error handling, rate limiting, and data validation.
 
-## Components
+## 🚀 Quick Start
 
-### 1. BinanceClient (`binance_client.py`)
+### What This Package Does
+- **Binance Integration**: REST API and WebSocket connections to Binance Futures
+- **Real-time Data**: Live price feeds via WebSocket streaming
+- **Historical Data**: Historical candle data download and storage
+- **Data Validation**: Exchange rules and constraints enforcement
+- **Rate Limiting**: API rate limit management and retry logic
+- **WebSocket Recovery**: Auto-reconnect and data resynchronization
 
-**Purpose**: HTTPX-based REST client and WebSocket connection manager for Binance Futures.
-
-**Features**:
-- Async REST API calls with automatic retries
-- WebSocket connection management
-- Support for klines, trades, and book ticker data
-- Proper error handling and timeout management
-
-**Usage**:
-```python
-from src.data.binance_client import BinanceClient, BinanceConfig
-
-config = BinanceConfig(
-    rest_url="https://fapi.binance.com",
-    ws_url="wss://fstream.binance.com"
-)
-
-async with BinanceClient(config) as client:
-    # Get exchange info
-    exchange_info = await client.get_exchange_info()
-    
-    # Get recent klines
-    klines = await client.get_klines("BTCUSDT", "1m", limit=100)
-    
-    # Get book ticker
-    ticker = await client.get_book_ticker("BTCUSDT")
-```
-
-### 2. BinanceValidator (`validators.py`)
-
-**Purpose**: Validates exchange rules and constraints for orders and data.
-
-**Features**:
-- Price and quantity validation against tick/step sizes
-- Minimum notional value checks
-- Price and quantity normalization
-- Support for all Binance filter types
-
-**Usage**:
-```python
-from src.data.validators import BinanceValidator
-
-validator = BinanceValidator()
-validator.set_symbol_info('BTCUSDT', exchange_info)
-
-# Validate order parameters
-valid, msg = validator.validate_order('BTCUSDT', 50000.00, 1.000)
-
-# Normalize prices to valid tick sizes
-normalized_price = validator.normalize_price('BTCUSDT', 50000.005)
-```
-
-### 3. RateLimiter (`rate_limit.py`)
-
-**Purpose**: Manages API rate limits with token bucket algorithm and retry logic.
-
-**Features**:
-- Token bucket rate limiting per request type
-- Exponential backoff with jitter for retries
-- Idempotency key support
-- Automatic cleanup of expired keys
-
-**Usage**:
-```python
-from src.data.rate_limit import RateLimiter, RateLimitConfig, RequestType
-
-config = RateLimitConfig(
-    requests_per_second=10,
-    burst_size=20,
-    retry_attempts=3
-)
-
-rate_limiter = RateLimiter(config)
-await rate_limiter.start()
-
-# Execute with rate limiting
-result = await rate_limiter.execute_with_retry(
-    my_function,
-    RequestType.REST,
-    idempotency_key="unique_key"
-)
-```
-
-### 4. WebSocketStreamManager (`stream.py`)
-
-**Purpose**: Manages live WebSocket streams with auto-reconnect and resync capabilities.
-
-**Features**:
-- Automatic reconnection with exponential backoff
-- Sequence number tracking and gap detection
-- REST API resync for missing data
-- Event deduplication and handler management
-- Heartbeat monitoring
-
-**Usage**:
-```python
-from src.data.stream import WebSocketStreamManager, StreamConfig
-
-config = StreamConfig(
-    max_reconnect_attempts=10,
-    base_reconnect_delay=1.0
-)
-
-stream_manager = WebSocketStreamManager(config, binance_client)
-await stream_manager.start()
-
-# Add event handlers
-stream_manager.add_handler("btcusdt@kline_1m", my_kline_handler)
-stream_manager.add_handler("btcusdt@trade", my_trade_handler)
-```
-
-### 5. BinanceDataFeed (`feed.py`)
-
-**Purpose**: Custom Backtrader data feed supporting both offline and live modes.
-
-**Features**:
-- **Offline Mode**: Reads from Parquet files in `/data/candles/`
-- **Live Mode**: Consumes from WebSocket streams
-- Strict UTC timestamp handling
-- No look-ahead bias protection
-- Data integrity validation
-- Automatic column mapping
-
-**Usage**:
-```python
-import backtrader as bt
-from src.data.feed import BinanceDataFeed
-
-# Offline mode
-feed = BinanceDataFeed(
-    symbol='BTCUSDT',
-    interval='1m',
-    data_dir='/data',
-    live=False
-)
-
-# Live mode
-feed = BinanceDataFeed(
-    symbol='BTCUSDT',
-    interval='1m',
-    data_dir='/data',
-    live=True,
-    stream_manager=stream_manager
-)
-
-# Add to Cerebro
-cerebro = bt.Cerebro()
-cerebro.adddata(feed)
-```
-
-## Data Storage Structure
-
-The data layer expects the following directory structure:
-
-```
-/data/
-├── candles/
-│   └── binance_futures/
-│       ├── BTCUSDT/
-│       │   ├── 1m.parquet
-│       │   ├── 5m.parquet
-│       │   └── 1h.parquet
-│       └── ETHUSDT/
-│           └── 1m.parquet
-└── backtests/
-    └── 2024-01-15/
-        └── BTCUSDT_smc_1m.json
-```
-
-## Configuration
-
-All configuration is handled through environment variables:
-
+### Run the Demo (5 minutes)
 ```bash
-# Exchange configuration
-EXCHANGE=binance_futures
-WS_URL=wss://fstream.binance.com
+# From project root
+cd examples
+python data_layer_demo.py
+```
+
+You should see:
+- Exchange information retrieval
+- Historical data download
+- Real-time price streaming
+- Data validation examples
+- Rate limiting demonstrations
+
+## 📦 Installation & Setup
+
+### Dependencies
+```bash
+pip install python-binance websockets httpx pandas pyarrow
+```
+
+### Environment Variables
+Create a `.env` file in the project root:
+
+```env
+# Binance API Configuration
+BINANCE_API_KEY=your_api_key_here
+BINANCE_SECRET_KEY=your_secret_key_here
+
+# WebSocket Configuration
+WS_URL=wss://fstream.binance.com/ws
 REST_URL=https://fapi.binance.com
 
-# Data storage
-DATA_DIR=/data
-DB_PATH=/data/app.db
-
-# API keys (for trading mode)
-BINANCE_API_KEY=your_api_key
-BINANCE_API_SECRET=your_api_secret
+# Data Storage
+DATA_DIR=./data
+CANDLES_DIR=./data/candles
 ```
 
-## Testing
+## 🎯 Basic Usage
 
-Run the test suite:
-
-```bash
-# Run all tests
-pytest tests/
-
-# Run specific test file
-pytest tests/test_data_layer.py
-
-# Run with coverage
-pytest --cov=src tests/
-```
-
-## Demo
-
-Run the demonstration script:
-
-```bash
-python examples/data_layer_demo.py
-```
-
-## Integration with Backtrader
-
-The `BinanceDataFeed` seamlessly integrates with Backtrader strategies:
+### Binance Client
 
 ```python
-import backtrader as bt
-from src.data.feed import BinanceDataFeed
+from src.data.binance_client import BinanceClient
 
-class MyStrategy(bt.Strategy):
-    def next(self):
-        # Access current data
-        current_price = self.data.close[0]
-        current_volume = self.data.volume[0]
-        
-        # Strategy logic here
-        if current_price > self.data.close[-1]:
-            self.buy()
+# Create client instance
+client = BinanceClient()
 
-# Setup
-cerebro = bt.Cerebro()
-cerebro.addstrategy(MyStrategy)
+# Get exchange information
+exchange_info = await client.get_exchange_info()
+print(f"Exchange: {exchange_info['exchangeName']}")
 
-# Add data feed
-feed = BinanceDataFeed(
-    symbol='BTCUSDT',
-    interval='1m',
-    data_dir='/data',
-    live=False
-)
-cerebro.adddata(feed)
-
-# Run backtest
-cerebro.run()
+# Get symbol information
+btc_info = await client.get_symbol_info('BTCUSDT')
+print(f"BTCUSDT tick size: {btc_info['tickSize']}")
 ```
 
-## Performance Considerations
+### WebSocket Streaming
 
-- **Signal Latency**: Live mode provides ≤1s latency from WebSocket events
-- **Memory Usage**: Live mode keeps last 1000 candles in memory
-- **File I/O**: Offline mode uses efficient Parquet format for historical data
-- **Rate Limiting**: Automatic API rate limit compliance with configurable thresholds
+```python
+from src.data.stream import BinanceWebSocketStream
 
-## Error Handling
+# Create stream instance
+stream = BinanceWebSocketStream(['btcusdt@kline_1m'])
 
-All components include comprehensive error handling:
+# Start streaming
+async def handle_message(msg):
+    print(f"Received: {msg}")
 
-- **Network Errors**: Automatic retries with exponential backoff
-- **Data Validation**: Integrity checks for gaps, duplicates, and anomalies
-- **WebSocket Recovery**: Automatic reconnection and data resync
-- **Graceful Degradation**: Fallback to REST API when WebSocket fails
+await stream.start(handle_message)
+```
+
+### Data Feed
+
+```python
+from src.data.feed import DataFeed
+
+# Create data feed
+feed = DataFeed(['BTCUSDT'], ['1m', '5m', '1h'])
+
+# Get latest data
+latest_data = await feed.get_latest_data('BTCUSDT', '1m')
+print(f"Latest BTC price: {latest_data['close']}")
+```
+
+## 🛠️ Core Components
+
+### 1. BinanceClient
+
+The main client for interacting with Binance Futures REST API:
+
+```python
+from src.data.binance_client import BinanceClient
+
+class BinanceClient:
+    """Binance Futures REST API client"""
+    
+    async def get_exchange_info(self) -> Dict[str, Any]:
+        """Get exchange information and trading rules"""
+        
+    async def get_symbol_info(self, symbol: str) -> Dict[str, Any]:
+        """Get specific symbol information"""
+        
+    async def get_klines(self, symbol: str, interval: str, 
+                         start_time: Optional[int] = None,
+                         end_time: Optional[int] = None,
+                         limit: int = 1000) -> List[List[Any]]:
+        """Get historical kline/candlestick data"""
+        
+    async def get_ticker_24hr(self, symbol: str) -> Dict[str, Any]:
+        """Get 24hr ticker price change statistics"""
+```
+
+### 2. WebSocket Stream
+
+Real-time data streaming via WebSocket:
+
+```python
+from src.data.stream import BinanceWebSocketStream
+
+class BinanceWebSocketStream:
+    """WebSocket stream for real-time data"""
+    
+    async def start(self, message_handler: Callable) -> None:
+        """Start WebSocket connection and streaming"""
+        
+    async def stop(self) -> None:
+        """Stop WebSocket connection"""
+        
+    async def subscribe(self, streams: List[str]) -> None:
+        """Subscribe to specific data streams"""
+        
+    async def unsubscribe(self, streams: List[str]) -> None:
+        """Unsubscribe from data streams"""
+```
+
+### 3. Data Feed
+
+Unified interface for both real-time and historical data:
+
+```python
+from src.data.feed import DataFeed
+
+class DataFeed:
+    """Unified data feed for real-time and historical data"""
+    
+    async def get_latest_data(self, symbol: str, interval: str) -> Dict[str, Any]:
+        """Get latest data point for symbol and interval"""
+        
+    async def get_historical_data(self, symbol: str, interval: str,
+                                 start_time: int, end_time: int) -> List[Dict[str, Any]]:
+        """Get historical data for symbol and interval"""
+        
+    async def subscribe_to_updates(self, symbol: str, interval: str,
+                                  callback: Callable) -> None:
+        """Subscribe to real-time updates for symbol and interval"""
+```
+
+### 4. Data Validators
+
+Exchange rules and data validation:
+
+```python
+from src.data.validators import DataValidator
+
+class DataValidator:
+    """Validate data according to exchange rules"""
+    
+    def validate_price(self, symbol: str, price: float) -> bool:
+        """Validate price against tick size and price precision"""
+        
+    def validate_quantity(self, symbol: str, quantity: float) -> bool:
+        """Validate quantity against step size and quantity precision"""
+        
+    def validate_order(self, symbol: str, side: str, 
+                      quantity: float, price: float) -> bool:
+        """Validate complete order parameters"""
+```
+
+### 5. Rate Limiter
+
+API rate limit management:
+
+```python
+from src.data.rate_limit import RateLimiter
+
+class RateLimiter:
+    """Manage API rate limits and request throttling"""
+    
+    async def acquire(self, endpoint: str) -> None:
+        """Acquire permission to make API request"""
+        
+    async def release(self, endpoint: str) -> None:
+        """Release rate limit slot after request completion"""
+        
+    def get_remaining_requests(self, endpoint: str) -> int:
+        """Get remaining requests for endpoint"""
+```
+
+## 📊 Data Formats
+
+### Kline/Candlestick Data
+
+```python
+# Raw kline data from Binance
+[
+    1499040000000,      # Open time
+    "0.01634790",       # Open
+    "0.80000000",       # High
+    "0.01575800",       # Low
+    "0.01577100",       # Close
+    "148976.11427815",  # Volume
+    1499644799999,      # Close time
+    "2434.19055334",    # Quote asset volume
+    308,                # Number of trades
+    "1756.87402397",    # Taker buy base asset volume
+    "28.46694368"       # Taker buy quote asset volume
+]
+
+# Processed candle data
+{
+    'timestamp': datetime(2024, 1, 1, 0, 0),
+    'open': 0.01634790,
+    'high': 0.80000000,
+    'low': 0.01575800,
+    'close': 0.01577100,
+    'volume': 148976.11427815,
+    'quote_volume': 2434.19055334,
+    'trades': 308,
+    'taker_buy_volume': 1756.87402397,
+    'taker_buy_quote_volume': 28.46694368
+}
+```
+
+### WebSocket Messages
+
+```python
+# Kline/Candlestick stream
+{
+    "e": "kline",     # Event type
+    "E": 123456789,   # Event time
+    "s": "BTCUSDT",   # Symbol
+    "k": {
+        "t": 123400000,  # Kline start time
+        "T": 123460000,  # Kline close time
+        "s": "BTCUSDT",  # Symbol
+        "i": "1m",       # Interval
+        "f": 100,        # First trade ID
+        "L": 200,        # Last trade ID
+        "o": "0.0010",   # Open price
+        "c": "0.0020",   # Close price
+        "h": "0.0025",   # High price
+        "l": "0.0015",   # Low price
+        "v": "1000",     # Base asset volume
+        "n": 100,        # Number of trades
+        "x": false,      # Is this kline closed?
+        "q": "1.0000",   # Quote asset volume
+        "V": "500",      # Taker buy base asset volume
+        "Q": "0.500"     # Taker buy quote asset volume
+    }
+}
+```
+
+## 🔧 Configuration
+
+### Exchange Configuration
+
+```python
+from src.data.config import ExchangeConfig
+
+config = ExchangeConfig(
+    rest_url="https://fapi.binance.com",
+    ws_url="wss://fstream.binance.com/ws",
+    api_key="your_api_key",
+    secret_key="your_secret_key",
+    testnet=False
+)
+```
+
+### Data Storage Configuration
+
+```python
+from src.data.config import DataConfig
+
+data_config = DataConfig(
+    data_dir="./data",
+    candles_dir="./data/candles",
+    max_file_size=100 * 1024 * 1024,  # 100MB
+    compression="snappy"
+)
+```
+
+### WebSocket Configuration
+
+```python
+from src.data.config import WebSocketConfig
+
+ws_config = WebSocketConfig(
+    ping_interval=30,
+    ping_timeout=10,
+    close_timeout=10,
+    max_message_size=1024 * 1024,  # 1MB
+    auto_reconnect=True,
+    reconnect_delay=5
+)
+```
+
+## 🚨 Error Handling
+
+### Common Errors
+
+#### 1. Rate Limit Exceeded
+```python
+try:
+    data = await client.get_klines('BTCUSDT', '1m')
+except RateLimitExceeded:
+    # Wait for rate limit reset
+    await asyncio.sleep(60)
+    data = await client.get_klines('BTCUSDT', '1m')
+```
+
+#### 2. WebSocket Connection Lost
+```python
+try:
+    await stream.start(handle_message)
+except WebSocketConnectionError:
+    # Auto-reconnect handled by stream
+    print("WebSocket reconnecting...")
+```
+
+#### 3. Invalid Symbol
+```python
+try:
+    info = await client.get_symbol_info('INVALID')
+except InvalidSymbolError as e:
+    print(f"Invalid symbol: {e}")
+```
+
+### Retry Logic
+
+```python
+from src.data.retry import retry_with_backoff
+
+@retry_with_backoff(max_retries=3, base_delay=1)
+async def get_data_with_retry():
+    return await client.get_klines('BTCUSDT', '1m')
+```
+
+## 📈 Performance Optimization
+
+### Data Caching
+
+```python
+from src.data.cache import DataCache
+
+cache = DataCache(max_size=1000)
+
+# Cache frequently accessed data
+cached_data = cache.get('BTCUSDT_1m')
+if cached_data is None:
+    cached_data = await client.get_klines('BTCUSDT', '1m')
+    cache.set('BTCUSDT_1m', cached_data)
+```
+
+### Batch Processing
+
+```python
+# Process multiple symbols at once
+symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+tasks = [client.get_symbol_info(symbol) for symbol in symbols]
+results = await asyncio.gather(*tasks)
+```
+
+### Memory Management
+
+```python
+# Use generators for large datasets
+async def get_large_dataset(symbol: str, start_time: int, end_time: int):
+    async for batch in client.get_klines_batched(symbol, '1m', start_time, end_time):
+        yield batch
+```
+
+## 🧪 Testing
+
+### Unit Tests
+
+```bash
+# Run data layer tests
+pytest tests/test_data/ -v
+
+# Run specific test file
+pytest tests/test_data/test_binance_client.py -v
+
+# Run with coverage
+pytest tests/test_data/ --cov=src.data
+```
+
+### Integration Tests
+
+```bash
+# Run integration tests (requires network)
+pytest tests/test_data/ -m integration
+
+# Test with real Binance API
+pytest tests/test_data/ --env=live
+```
+
+### Mock Testing
+
+```python
+from unittest.mock import AsyncMock, patch
+
+async def test_binance_client():
+    with patch('src.data.binance_client.httpx.AsyncClient') as mock_client:
+        mock_client.return_value.get.return_value.json = AsyncMock(
+            return_value={'exchangeName': 'Binance Futures'}
+        )
+        
+        client = BinanceClient()
+        info = await client.get_exchange_info()
+        assert info['exchangeName'] == 'Binance Futures'
+```
+
+## 🔒 Security
+
+### API Key Management
+
+- Never commit API keys to version control
+- Use environment variables for sensitive data
+- Rotate keys regularly
+- Use read-only keys for testing
+
+### Data Validation
+
+- Validate all incoming data
+- Sanitize user inputs
+- Check data integrity
+- Log suspicious activities
+
+### Rate Limiting
+
+- Respect exchange rate limits
+- Implement exponential backoff
+- Monitor API usage
+- Alert on rate limit violations
+
+## 📊 Monitoring
+
+### Health Checks
+
+```python
+from src.data.monitoring import DataLayerHealth
+
+health = DataLayerHealth()
+
+# Check data layer health
+status = await health.check_health()
+print(f"Data layer status: {status}")
+
+# Get performance metrics
+metrics = await health.get_metrics()
+print(f"API response time: {metrics['avg_response_time']}ms")
+```
+
+### Logging
+
+```python
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+# Log data operations
+logger.info("Downloading historical data", 
+           symbol="BTCUSDT", 
+           interval="1h", 
+           start_time=start_time)
+
+# Log errors
+logger.error("Failed to connect to WebSocket", 
+            error=str(e), 
+            retry_count=retry_count)
+```
+
+## 🤝 Contributing
+
+### Adding New Data Sources
+
+1. Create new client class inheriting from `BaseDataClient`
+2. Implement required methods
+3. Add configuration options
+4. Write comprehensive tests
+5. Update documentation
+
+### Reporting Issues
+
+1. Check the troubleshooting section first
+2. Provide error messages and stack traces
+3. Include your environment details
+4. Describe what you were trying to do
+
+### Getting Help
+
+- Check the main project README
+- Look at existing examples
+- Run the demo scripts
+- Create a minimal reproduction of your issue
+
+## 📝 License
+
+This package is part of the Smart Trading Bot project and follows the same license terms.
+
+---
+
+**Happy Trading! 🚀**
+
+*Remember: Always validate data and handle errors gracefully in production environments.*

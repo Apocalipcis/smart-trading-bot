@@ -17,7 +17,10 @@ import pyarrow.parquet as pq
 
 from .binance_client import BinanceClient, BinanceConfig
 from .validators import BinanceValidator
-from ..storage.files import FileManager
+try:
+    from src.storage.files import FileManager
+except ImportError:
+    from ..storage.files import FileManager
 
 
 class DataDownloader:
@@ -210,7 +213,7 @@ class DataDownloader:
     
     def _process_candles(
         self, 
-        candles: List[Dict[str, Any]], 
+        candles: List[Any], 
         symbol: str, 
         timeframe: str
     ) -> pd.DataFrame:
@@ -218,25 +221,42 @@ class DataDownloader:
         if not candles:
             raise ValueError("No candles to process")
         
-        # Convert to DataFrame
-        df = pd.DataFrame(candles)
-        
-        # Rename columns to match specification
-        column_mapping = {
-            0: 'open_time',
-            1: 'open',
-            2: 'high',
-            3: 'low',
-            4: 'close',
-            5: 'volume',
-            6: 'close_time',
-            7: 'quote_volume',
-            8: 'trades',
-            9: 'taker_buy_base',
-            10: 'taker_buy_quote'
-        }
-        
-        df = df.rename(columns=column_mapping)
+        # Check if candles are KlineData objects or raw lists
+        if hasattr(candles[0], 'open_time'):
+            # Handle KlineData objects (from BinanceClient)
+            df = pd.DataFrame([{
+                'open_time': candle.open_time,
+                'open': candle.open,
+                'high': candle.high,
+                'low': candle.low,
+                'close': candle.close,
+                'volume': candle.volume,
+                'close_time': candle.close_time,
+                'quote_volume': candle.quote_volume,
+                'trades': candle.trades,
+                'taker_buy_base': candle.taker_buy_base,
+                'taker_buy_quote': candle.taker_buy_quote
+            } for candle in candles])
+        else:
+            # Handle raw list format (legacy support)
+            df = pd.DataFrame(candles)
+            
+            # Rename columns to match specification
+            column_mapping = {
+                0: 'open_time',
+                1: 'open',
+                2: 'high',
+                3: 'low',
+                4: 'close',
+                5: 'volume',
+                6: 'close_time',
+                7: 'quote_volume',
+                8: 'trades',
+                9: 'taker_buy_base',
+                10: 'taker_buy_quote'
+            }
+            
+            df = df.rename(columns=column_mapping)
         
         # Convert data types
         numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'quote_volume', 'taker_buy_base', 'taker_buy_quote']
@@ -262,7 +282,7 @@ class DataDownloader:
         return df
     
     def _validate_candle_data(self, df: pd.DataFrame, symbol: str, timeframe: str):
-        """Validate downloaded candle data."""
+        """Validate downloaded candle data with improved error handling."""
         if df.empty:
             raise ValueError(f"No data after processing for {symbol} {timeframe}")
         
@@ -283,7 +303,7 @@ class DataDownloader:
         if not invalid_ohlc.empty:
             raise ValueError(f"Invalid OHLC data found: high < low in {len(invalid_ohlc)} rows")
         
-        # Check for time gaps
+        # Check for time gaps with improved handling
         if len(df) > 1:
             time_diffs = df['datetime'].diff()
             expected_interval = self._get_expected_interval(timeframe)
@@ -292,6 +312,48 @@ class DataDownloader:
             gaps = time_diffs[time_diffs > expected_interval + tolerance]
             if not gaps.empty:
                 self.logger.warning(f"Time gaps detected in {symbol} {timeframe}: {len(gaps)} gaps")
+                # Log details about the gaps
+                gap_details = []
+                for idx, gap in gaps.items():
+                    if pd.notna(gap):
+                        gap_details.append(f"Gap at {df.loc[idx, 'datetime']}: {gap}")
+                if gap_details:
+                    self.logger.warning(f"Gap details: {'; '.join(gap_details[:5])}")  # Limit to first 5 gaps
+                
+                # Check if gaps are too large to be acceptable
+                max_acceptable_gap = expected_interval * 10  # Allow gaps up to 10x the expected interval
+                large_gaps = gaps[gaps > max_acceptable_gap]
+                if not large_gaps.empty:
+                    self.logger.error(f"Large time gaps detected in {symbol} {timeframe}: {len(large_gaps)} gaps exceed acceptable threshold")
+                    # For large gaps, we might want to raise an error or handle differently
+                    if len(large_gaps) > len(df) * 0.1:  # If more than 10% of data has large gaps
+                        self.logger.error(f"Too many large gaps in {symbol} {timeframe}, data quality may be poor")
+        
+        # Check for duplicate timestamps
+        duplicates = df[df.duplicated(subset=['datetime'], keep=False)]
+        if not duplicates.empty:
+            self.logger.warning(f"Duplicate timestamps found in {symbol} {timeframe}: {len(duplicates)} rows")
+            # Remove duplicates keeping the first occurrence
+            df.drop_duplicates(subset=['datetime'], keep='first', inplace=True)
+            self.logger.info(f"Removed {len(duplicates)} duplicate timestamps from {symbol} {timeframe}")
+        
+        # Check for missing values in critical columns
+        critical_columns = ['open', 'high', 'low', 'close', 'volume']
+        missing_values = df[critical_columns].isnull().sum()
+        if missing_values.any():
+            self.logger.warning(f"Missing values found in {symbol} {timeframe}: {missing_values.to_dict()}")
+            # Remove rows with missing values in critical columns
+            initial_count = len(df)
+            df.dropna(subset=critical_columns, inplace=True)
+            final_count = len(df)
+            if final_count < initial_count:
+                self.logger.info(f"Removed {initial_count - final_count} rows with missing values from {symbol} {timeframe}")
+        
+        # Final validation
+        if df.empty:
+            raise ValueError(f"After validation and cleaning, no data remains for {symbol} {timeframe}")
+        
+        self.logger.info(f"Data validation completed for {symbol} {timeframe}: {len(df)} valid candles")
     
     def _get_expected_interval(self, timeframe: str) -> pd.Timedelta:
         """Get expected time interval for a timeframe."""
@@ -332,12 +394,22 @@ class DataDownloader:
             table = pq.read_table(file_path)
             df = table.to_pandas()
             
+            # Handle datetime as index or column
+            if df.index.name == 'datetime' or isinstance(df.index, pd.DatetimeIndex):
+                start_date = df.index.min()
+                end_date = df.index.max()
+            elif 'datetime' in df.columns:
+                start_date = df['datetime'].min()
+                end_date = df['datetime'].max()
+            else:
+                raise ValueError("No datetime column or index found")
+            
             return {
                 "symbol": file_path.parent.name,
                 "timeframe": file_path.stem,
                 "total_candles": len(df),
-                "start_date": df['datetime'].min().isoformat(),
-                "end_date": df['datetime'].max().isoformat(),
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
                 "file_path": str(file_path),
                 "file_size_mb": file_path.stat().st_size / (1024 * 1024),
                 "status": "existing"
@@ -381,6 +453,7 @@ class DataDownloader:
 async def download_data_cli():
     """Command-line interface for downloading historical data."""
     import argparse
+    import os
     from datetime import datetime, timedelta
     
     parser = argparse.ArgumentParser(description="Download historical data for backtesting")

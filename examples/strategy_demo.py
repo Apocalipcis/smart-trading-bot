@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from strategies.registry import get_registry, StrategyRegistry
 from strategies.base import BaseStrategy, Signal
-from strategies.smc import SMCStrategy
+from strategies.smc_signal import SMCSignalStrategy
 
 
 def demo_strategy_registry():
@@ -64,18 +64,18 @@ def demo_smc_strategy():
     
     # Create SMC strategy class info (not instance)
     print(f"SMC Strategy class loaded successfully")
-    print(f"Version: {SMCStrategy.version}")
+    print(f"Version: {SMCSignalStrategy.version}")
     print(f"Parameters:")
     
     # Extract parameters safely
     try:
-        params_dict = SMCStrategy.params._asdict()
+        params_dict = SMCSignalStrategy.params._asdict()
         for param_name, param_value in params_dict.items():
             print(f"  {param_name}: {param_value}")
     except AttributeError:
         # Fallback for different param formats
         try:
-            params_dict = dict(SMCStrategy.params)
+            params_dict = dict(SMCSignalStrategy.params)
             for param_name, param_value in params_dict.items():
                 print(f"  {param_name}: {param_value}")
         except (TypeError, ValueError):
@@ -85,10 +85,10 @@ def demo_smc_strategy():
     
     # Show strategy class information
     print("Strategy Class Information:")
-    print(f"  Name: {SMCStrategy.__name__}")
-    print(f"  Module: {SMCStrategy.__module__}")
-    print(f"  Base Classes: {[base.__name__ for base in SMCStrategy.__bases__]}")
-    print(f"  Has generate_signals method: {hasattr(SMCStrategy, 'generate_signals')}")
+    print(f"  Name: {SMCSignalStrategy.__name__}")
+    print(f"  Module: {SMCSignalStrategy.__module__}")
+    print(f"  Base Classes: {[base.__name__ for base in SMCSignalStrategy.__bases__]}")
+    print(f"  Has generate_signals method: {hasattr(SMCSignalStrategy, 'generate_signals')}")
     print()
 
 
