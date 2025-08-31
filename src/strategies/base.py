@@ -242,6 +242,8 @@ class BaseStrategy(bt.Strategy):
                         'status': 'closed'
                     }
                     self.trade_history.append(trade_info)
+                    print(f"Added trade to history: {trade_info}")
+                    print(f"Trade history now has {len(self.trade_history)} trades")
     
     def get_strategy_stats(self) -> Dict[str, Any]:
         """
@@ -274,6 +276,7 @@ class BaseStrategy(bt.Strategy):
         print(f"  Total trades: {stats['total_trades']}")
         print(f"  Total PnL: ${stats['total_pnl']:.2f}")
         print(f"  Win rate: {stats['winning_trades']}/{stats['total_trades']}")
+        print(f"  Trade history content: {self.trade_history}")
 
     # Multi-timeframe support methods
     
@@ -287,13 +290,20 @@ class BaseStrategy(bt.Strategy):
         Returns:
             Optional[bt.feeds.PandasData]: Data feed for the role, or None if not found
         """
-        # In a multi-timeframe setup, data feeds would be organized by role
-        # This is a placeholder implementation
-        if hasattr(self, f'data_{role.lower()}'):
-            return getattr(self, f'data_{role.lower()}')
-        elif hasattr(self, 'datas') and len(self.datas) > 0:
-            # Fallback to first data feed
+        # Look for data feeds by their names
+        for data in self.datas:
+            if hasattr(data, '_name') and data._name == role:
+                return data
+        
+        # Fallback: look for data feeds with role in their name
+        for data in self.datas:
+            if hasattr(data, '_name') and role in data._name:
+                return data
+        
+        # Final fallback: use first data feed if only one exists
+        if len(self.datas) == 1:
             return self.datas[0]
+        
         return None
     
     def get_htf_data(self) -> Optional[bt.feeds.PandasData]:
@@ -315,22 +325,22 @@ class BaseStrategy(bt.Strategy):
             Optional[float]: Current price, or None if not available
         """
         data = self.get_data_by_role(role)
-        if data and len(data) > 0:
+        if data is not None and len(data) > 0:
             return data.close[0]
         return None
     
     def get_htf_price(self) -> Optional[float]:
-        """Get current higher timeframe price."""
+        """Get higher timeframe price."""
         return self.get_current_price('HTF')
     
     def get_ltf_price(self) -> Optional[float]:
-        """Get current lower timeframe price."""
+        """Get lower timeframe price."""
         return self.get_current_price('LTF')
     
     def is_htf_bar_complete(self) -> bool:
         """Check if the higher timeframe bar is complete."""
         htf_data = self.get_htf_data()
-        if htf_data and len(htf_data) > 0:
+        if htf_data is not None and len(htf_data) > 0:
             # Check if this is a new HTF bar
             return htf_data.datetime.date(0) != htf_data.datetime.date(-1)
         return False
@@ -345,7 +355,7 @@ class BaseStrategy(bt.Strategy):
         htf_data = self.get_htf_data()
         ltf_data = self.get_ltf_data()
         
-        if htf_data and ltf_data:
+        if htf_data is not None and ltf_data is not None:
             # This would need to be implemented based on actual timeframe data
             # For now, return None as placeholder
             return None
@@ -359,8 +369,8 @@ class BaseStrategy(bt.Strategy):
         Returns:
             bool: True if setup is valid, False otherwise
         """
-        if 'HTF' in self.required_roles and not self.get_htf_data():
+        if 'HTF' in self.required_roles and self.get_htf_data() is None:
             return False
-        if 'LTF' in self.required_roles and not self.get_ltf_data():
+        if 'LTF' in self.required_roles and self.get_ltf_data() is None:
             return False
         return True

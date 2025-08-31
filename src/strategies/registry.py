@@ -15,7 +15,10 @@ from datetime import datetime
 import json
 import logging
 
-from .base import BaseStrategy
+try:
+    from src.strategies.base import BaseStrategy
+except ImportError:
+    from .base import BaseStrategy
 
 
 class StrategyInfo:

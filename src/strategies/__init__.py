@@ -7,7 +7,8 @@ All strategies inherit from a base class that provides the signal generation con
 
 from .base import BaseStrategy
 from .registry import StrategyRegistry
-from .smc import SMCStrategy
+# SMCStrategy removed - using SMCSignalStrategy instead
+from .smc_signal import SMCSignalStrategy
 
 __version__ = "1.0.0"
-__all__ = ["BaseStrategy", "StrategyRegistry", "SMCStrategy"]
+__all__ = ["BaseStrategy", "StrategyRegistry", "SMCSignalStrategy"]

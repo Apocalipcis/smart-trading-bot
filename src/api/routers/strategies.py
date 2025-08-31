@@ -12,8 +12,15 @@ from ..schemas import (
 
 router = APIRouter(prefix="/strategies", tags=["strategies"])
 
-# Strategy metadata with role requirements
-STRATEGIES_METADATA = [
+# Import strategy registry
+try:
+    from ...strategies.registry import get_registry
+except ImportError:
+    # Fallback for when strategies package is not available
+    get_registry = None
+
+# Fallback strategy metadata (only used when registry is not available)
+FALLBACK_STRATEGIES_METADATA = [
     StrategyInfo(
         name="SMC",
         description="Smart Money Concepts Strategy - Uses order blocks, fair value gaps, and market structure for entry/exit decisions",
@@ -61,76 +68,58 @@ STRATEGIES_METADATA = [
             "stop_loss_pct": {"type": "float", "default": 1.0, "min": 0.1, "max": 5.0, "description": "Stop loss percentage"}
         },
         is_active=True
-    ),
-    StrategyInfo(
-        name="MEAN_REVERSION",
-        description="Mean reversion strategy using Bollinger Bands and RSI",
-        version="1.0.0",
-        required_roles=[TimeframeRole.HTF, TimeframeRole.LTF],
-        role_constraints=[
-            TimeframeConstraint(
-                role=TimeframeRole.HTF,
-                min_timeframe="4h",
-                max_timeframe="1d",
-                description="HTF for trend context and mean calculation"
-            ),
-            TimeframeConstraint(
-                role=TimeframeRole.LTF,
-                min_timeframe="15m",
-                max_timeframe="1h",
-                description="LTF for entry/exit signals"
-            )
-        ],
-        parameters={
-            "bb_period": {"type": "int", "default": 20, "min": 10, "max": 50, "description": "Bollinger Bands period"},
-            "bb_std": {"type": "float", "default": 2.0, "min": 1.0, "max": 3.0, "description": "Bollinger Bands standard deviation"},
-            "rsi_period": {"type": "int", "default": 14, "min": 10, "max": 30, "description": "RSI period"},
-            "rsi_oversold": {"type": "int", "default": 30, "min": 20, "max": 40, "description": "RSI oversold threshold"},
-            "rsi_overbought": {"type": "int", "default": 70, "min": 60, "max": 80, "description": "RSI overbought threshold"}
-        },
-        is_active=True
-    ),
-    StrategyInfo(
-        name="BREAKOUT",
-        description="Breakout strategy using support/resistance levels and volume confirmation",
-        version="1.0.0",
-        required_roles=[TimeframeRole.HTF, TimeframeRole.LTF],
-        role_constraints=[
-            TimeframeConstraint(
-                role=TimeframeRole.HTF,
-                min_timeframe="1h",
-                max_timeframe="1d",
-                description="HTF for support/resistance identification"
-            ),
-            TimeframeConstraint(
-                role=TimeframeRole.LTF,
-                min_timeframe="5m",
-                max_timeframe="30m",
-                description="LTF for breakout confirmation and entry"
-            )
-        ],
-        parameters={
-            "support_resistance_period": {"type": "int", "default": 20, "min": 10, "max": 50, "description": "Period for S/R calculation"},
-            "breakout_threshold": {"type": "float", "default": 0.5, "min": 0.1, "max": 2.0, "description": "Breakout threshold percentage"},
-            "volume_multiplier": {"type": "float", "default": 1.5, "min": 1.0, "max": 5.0, "description": "Volume confirmation multiplier"},
-            "retest_enabled": {"type": "bool", "default": True, "description": "Enable retest entries"},
-            "stop_loss_atr": {"type": "float", "default": 2.0, "min": 1.0, "max": 5.0, "description": "Stop loss in ATR multiples"}
-        },
-        is_active=True
     )
 ]
+
+
+def _get_strategies_from_registry() -> List[StrategyInfo]:
+    """Get strategies dynamically from the registry."""
+    if get_registry is None:
+        return FALLBACK_STRATEGIES_METADATA
+    
+    try:
+        registry = get_registry()
+        strategies = []
+        
+        for name, strategy_info in registry.strategies.items():
+            # Convert registry strategy info to API strategy info
+            api_strategy = StrategyInfo(
+                name=name,
+                description=strategy_info.description or f"Strategy: {name}",
+                version=strategy_info.version,
+                required_roles=strategy_info.required_roles or [TimeframeRole.LTF],
+                role_constraints=strategy_info.role_constraints or [
+                    TimeframeConstraint(
+                        role=TimeframeRole.LTF,
+                        min_timeframe="1m",
+                        max_timeframe="1h",
+                        description="Default timeframe constraint"
+                    )
+                ],
+                parameters=strategy_info.parameters or {},
+                is_active=True
+            )
+            strategies.append(api_strategy)
+        
+        return strategies
+    except Exception as e:
+        # Log error and return fallback
+        print(f"Error getting strategies from registry: {e}")
+        return FALLBACK_STRATEGIES_METADATA
 
 
 @router.get("/", response_model=List[StrategyInfo])
 async def get_strategies() -> List[StrategyInfo]:
     """Get all available strategies with their metadata and role requirements."""
-    return [s for s in STRATEGIES_METADATA if s.is_active]
+    return _get_strategies_from_registry()
 
 
 @router.get("/{strategy_name}", response_model=StrategyInfo)
 async def get_strategy(strategy_name: str) -> StrategyInfo:
     """Get information about a specific strategy."""
-    for strategy in STRATEGIES_METADATA:
+    strategies = _get_strategies_from_registry()
+    
+    for strategy in strategies:
         if strategy.name.upper() == strategy_name.upper() and strategy.is_active:
             return strategy
     
@@ -149,7 +138,8 @@ async def validate_strategy_requirements(
     """Validate that timeframe role assignments meet strategy requirements."""
     # Find strategy
     strategy = None
-    for s in STRATEGIES_METADATA:
+    strategies = _get_strategies_from_registry()
+    for s in strategies:
         if s.name.upper() == strategy_name.upper() and s.is_active:
             strategy = s
             break
@@ -207,7 +197,8 @@ async def validate_strategy_requirements(
 @router.get("/{strategy_name}/parameters")
 async def get_strategy_parameters(strategy_name: str) -> APIResponse:
     """Get parameters for a specific strategy."""
-    for strategy in STRATEGIES_METADATA:
+    strategies = _get_strategies_from_registry()
+    for strategy in strategies:
         if strategy.name.upper() == strategy_name.upper() and strategy.is_active:
             return APIResponse(
                 success=True,

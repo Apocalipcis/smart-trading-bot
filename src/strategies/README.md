@@ -8,7 +8,7 @@ A comprehensive, plugin-based trading strategy system built on Backtrader for th
 - **Base Strategy Class**: Abstract foundation for all trading strategies
 - **Strategy Registry**: Auto-discovery and management of strategy files
 - **Signal System**: Standardized trading signal format with validation
-- **SMC Strategy**: Smart Money Concepts implementation included
+- **SMC Signal Strategy**: Simplified, optimized Smart Money Concepts implementation
 - **Plugin Architecture**: Easy to add new strategies
 
 ### Run the Demo (5 minutes)
@@ -20,7 +20,7 @@ python strategy_demo.py
 
 You should see:
 - Strategy registry discovery
-- SMC strategy information
+- needtrategy information
 - Sample signal generation
 - Custom strategy examples
 
@@ -55,14 +55,14 @@ If you see "Import 'backtrader' could not be resolved":
 
 ## 🎯 Basic Usage
 
-### Using the SMC Strategy
+### Using the SMC Signal Strategy
 
 ```python
-from strategies.smc import SMCStrategy
+from strategies.smc_signal import SMCSignalStrategy
 from strategies.base import Signal
 
 # Create strategy instance (in Backtrader context)
-strategy = SMCStrategy()
+strategy = SMCSignalStrategy()
 
 # Generate signals
 signals = strategy.generate_signals()
@@ -191,8 +191,8 @@ for strategy in strategies:
     print(f"- {strategy['name']} v{strategy['version']}")
 
 # Get specific strategy
-smc = registry.get_strategy('SMC')
-smc_info = registry.get_strategy_info('SMC')
+smc = registry.get_strategy('SMCSignalStrategy')
+smc_info = registry.get_strategy_info('SMCSignalStrategy')
 ```
 
 ### Manual Registration
@@ -247,7 +247,7 @@ The base strategy automatically validates signals:
 ```python
 # SMC strategy metadata
 metadata = {
-    'strategy': 'SMC',
+    'strategy': 'SMCSignalStrategy',
     'trend': 'bullish',
     'rsi': 45.0,
     'volume_ratio': 1.8,
@@ -269,7 +269,7 @@ metadata = {
 ### Basic Backtest Setup
 ```python
 import backtrader as bt
-from strategies.smc import SMCStrategy
+from strategies.smc_signal import SMCSignalStrategy
 
 # Create Cerebro engine
 cerebro = bt.Cerebro()
@@ -279,7 +279,7 @@ data = bt.feeds.YourDataFeed(...)
 cerebro.adddata(data)
 
 # Add strategy
-cerebro.addstrategy(SMCStrategy)
+cerebro.addstrategy(SMCSignalStrategy)
 
 # Set initial cash
 cerebro.broker.setcash(10000.0)
@@ -292,7 +292,7 @@ results = cerebro.run()
 ```python
 # Customize strategy parameters
 cerebro.addstrategy(
-    SMCStrategy,
+    SMCSignalStrategy,
     risk_per_trade=0.03,        # 3% risk per trade
     min_risk_reward=2.5,        # 2.5:1 minimum
     lookback_period=30,         # 30 bars lookback

@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from uuid import UUID, uuid4
 import re
 
+import pandas as pd
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -135,8 +136,16 @@ class BacktestRequest(BaseModel):
     @field_validator('end_date')
     @classmethod
     def validate_date_range(cls, v, info):
-        if 'start_date' in info.data and v <= info.data['start_date']:
-            raise ValueError('End date must be after start date')
+        if 'start_date' in info.data:
+            start_date = info.data['start_date']
+            # Ensure both dates are timezone-aware for comparison
+            if v.tzinfo is None:
+                v = v.replace(tzinfo=timezone.utc)
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+            
+            if v <= start_date:
+                raise ValueError('End date must be after start date')
         return v
 
     @field_validator('timeframes')
@@ -207,6 +216,26 @@ class BacktestRequest(BaseModel):
             raise ValueError('Strategy name must not be empty')
         return v.strip()
 
+    @field_validator('start_date', 'end_date')
+    @classmethod
+    def validate_dates(cls, v):
+        """Ensure dates are timezone-aware and convert to UTC if needed."""
+        if isinstance(v, str):
+            # Parse string dates and make them timezone-aware
+            try:
+                v = pd.to_datetime(v)
+            except Exception as e:
+                raise ValueError(f'Invalid date format: {v}. Use ISO format (YYYY-MM-DD)')
+        
+        if v.tzinfo is None:
+            # If naive datetime, assume UTC
+            v = v.replace(tzinfo=timezone.utc)
+        else:
+            # Convert to UTC if timezone-aware
+            v = v.astimezone(timezone.utc)
+        
+        return v
+
     @model_validator(mode='before')
     @classmethod
     def validate_legacy_compatibility(cls, data):
@@ -230,6 +259,25 @@ class BacktestRequest(BaseModel):
         return data
 
 
+class TradeDetail(BaseModel):
+    """Detailed information about a single trade."""
+    entry_date: datetime = Field(..., description="When position was opened")
+    exit_date: datetime = Field(..., description="When position was closed")
+    entry_price: float = Field(..., description="Entry price")
+    exit_price: float = Field(..., description="Exit price")
+    size: float = Field(..., description="Position size")
+    side: str = Field(..., description="Position side (long/short)")
+    pnl: float = Field(..., description="Profit/Loss")
+    pnl_comm: float = Field(..., description="Commission costs")
+    pnl_slippage: float = Field(..., description="Slippage costs")
+    return_pct: float = Field(..., description="Return percentage")
+    exit_reason: str = Field(..., description="How position was closed (TP/SL/manual)")
+    stop_loss: Optional[float] = Field(None, description="Stop loss price")
+    take_profit: Optional[float] = Field(None, description="Take profit price")
+    duration_hours: float = Field(..., description="Position duration in hours")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional trade info")
+
+
 class BacktestResult(BaseModel):
     """Backtest result model."""
     id: UUID = Field(..., description="Unique backtest ID")
@@ -247,9 +295,15 @@ class BacktestResult(BaseModel):
     profitable_trades: int = Field(..., description="Number of profitable trades")
     max_drawdown: float = Field(..., description="Maximum drawdown percentage")
     sharpe_ratio: float = Field(..., description="Sharpe ratio")
+    profit_factor: float = Field(..., description="Profit factor")
+    avg_trade: float = Field(..., description="Average trade P&L")
+    max_consecutive_losses: int = Field(..., description="Maximum consecutive losses")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Strategy parameters")
     artifacts_path: Optional[str] = Field(None, description="Path to artifacts")
+    
+    # Detailed trade information
+    trades: List[TradeDetail] = Field(default_factory=list, description="Detailed trade history")
     
     # Legacy support fields
     pair: Optional[str] = Field(None, description="Legacy single pair field")
@@ -378,3 +432,22 @@ class StrategyInfo(BaseModel):
     is_active: bool = Field(default=True, description="Whether this strategy is available")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TradeDetail(BaseModel):
+    """Detailed information about a single trade."""
+    entry_date: datetime = Field(..., description="When position was opened")
+    exit_date: datetime = Field(..., description="When position was closed")
+    entry_price: float = Field(..., description="Entry price")
+    exit_price: float = Field(..., description="Exit price")
+    size: float = Field(..., description="Position size")
+    side: str = Field(..., description="Position side (long/short)")
+    pnl: float = Field(..., description="Profit/Loss")
+    pnl_comm: float = Field(..., description="Commission costs")
+    pnl_slippage: float = Field(..., description="Slippage costs")
+    return_pct: float = Field(..., description="Return percentage")
+    exit_reason: str = Field(..., description="How position was closed (TP/SL/manual)")
+    stop_loss: Optional[float] = Field(None, description="Stop loss price")
+    take_profit: Optional[float] = Field(None, description="Take profit price")
+    duration_hours: float = Field(..., description="Position duration in hours")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional trade info")

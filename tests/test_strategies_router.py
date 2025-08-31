@@ -38,12 +38,12 @@ class TestStrategiesEndpoints:
     
     def test_get_specific_strategy(self):
         """Test getting information about a specific strategy."""
-        # Test with a valid strategy
-        response = client.get("/api/v1/strategies/SMC")
+        # Test with a valid strategy - use the actual name from registry
+        response = client.get("/api/v1/strategies/SMCSignalStrategy")
         assert response.status_code == 200
         
         data = response.json()
-        assert data["name"] == "SMC"
+        assert data["name"] == "SMCSignalStrategy"
         assert "description" in data
         assert "required_roles" in data
         assert "role_constraints" in data
@@ -65,7 +65,7 @@ class TestStrategiesEndpoints:
             "timeframes": ["1h", "15m"],
             "tf_roles": {"1h": "HTF", "15m": "LTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
@@ -74,12 +74,12 @@ class TestStrategiesEndpoints:
     
     def test_validate_strategy_requirements_missing_roles(self):
         """Test validating strategy requirements with missing required roles."""
-        # SMC requires both HTF and LTF roles
+        # SMCSignalStrategy requires both HTF and LTF roles
         params = {
             "timeframes": ["1h"],
             "tf_roles": {"1h": "HTF"}  # Missing LTF role
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
@@ -94,7 +94,7 @@ class TestStrategiesEndpoints:
             "timeframes": ["1m", "5m"],  # Both too small for HTF role
             "tf_roles": {"1m": "HTF", "5m": "LTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
@@ -104,7 +104,7 @@ class TestStrategiesEndpoints:
     
     def test_get_strategy_parameters(self):
         """Test getting strategy parameters."""
-        response = client.get("/api/v1/strategies/SMC/parameters")
+        response = client.get("/api/v1/strategies/SMCSignalStrategy/parameters")
         assert response.status_code == 200
         
         data = response.json()
@@ -132,11 +132,11 @@ class TestStrategiesValidationEdgeCases:
             "timeframes": [],
             "tf_roles": {}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
-        assert data["success"] is False  # Should fail because SMC requires roles
+        assert data["success"] is False  # Should fail because SMCSignalStrategy requires roles
         assert "errors" in data["data"]
     
     def test_validate_empty_tf_roles(self):
@@ -145,7 +145,7 @@ class TestStrategiesValidationEdgeCases:
             "timeframes": ["1h", "15m"],
             "tf_roles": {}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
@@ -158,11 +158,11 @@ class TestStrategiesValidationEdgeCases:
             "timeframes": ["1h", "1h"],
             "tf_roles": {"1h": "HTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
-        # Should fail because SMC requires both HTF and LTF
+        # Should fail because SMCSignalStrategy requires both HTF and LTF
         assert data["success"] is False
         assert "errors" in data["data"]
     
@@ -172,7 +172,7 @@ class TestStrategiesValidationEdgeCases:
             "timeframes": ["1h", "15m"],
             "tf_roles": {"1h": "INVALID_ROLE", "15m": "LTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 200
         
         data = response.json()
@@ -227,13 +227,13 @@ class TestStrategiesValidationLogic:
     """Test specific validation logic for different strategies."""
     
     def test_smc_strategy_validation(self):
-        """Test SMC specific validation."""
-        # SMC requires both HTF and LTF roles
+        """Test SMCSignalStrategy specific validation."""
+        # SMCSignalStrategy requires both HTF and LTF roles
         valid_params = {
             "timeframes": ["1h", "15m"],
             "tf_roles": {"1h": "HTF", "15m": "LTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=valid_params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=valid_params)
         assert response.status_code == 200
         
         data = response.json()
@@ -244,7 +244,7 @@ class TestStrategiesValidationLogic:
             "timeframes": ["1h"],
             "tf_roles": {"1h": "HTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=invalid_params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=invalid_params)
         assert response.status_code == 200
         
         data = response.json()
@@ -252,13 +252,13 @@ class TestStrategiesValidationLogic:
         assert "errors" in data["data"]
     
     def test_simple_test_strategy_validation(self):
-        """Test SIMPLE_TEST strategy validation."""
-        # SIMPLE_TEST only requires LTF role
+        """Test SimpleTestStrategy validation."""
+        # SimpleTestStrategy only requires LTF role
         valid_params = {
             "timeframes": ["15m"],
             "tf_roles": {"15m": "LTF"}
         }
-        response = client.post("/api/v1/strategies/SIMPLE_TEST/validate", json=valid_params)
+        response = client.post("/api/v1/strategies/SimpleTestStrategy/validate", json=valid_params)
         assert response.status_code == 200
         
         data = response.json()
@@ -268,10 +268,10 @@ class TestStrategiesValidationLogic:
         """Test that strategy constraints are properly validated."""
         # Test with timeframes that violate constraints
         invalid_params = {
-            "timeframes": ["1m", "5m"],  # Both too small for HTF role in SMC
+            "timeframes": ["1m", "5m"],  # Both too small for HTF role in SMCSignalStrategy
             "tf_roles": {"1m": "HTF", "5m": "LTF"}
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=invalid_params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=invalid_params)
         assert response.status_code == 200
         
         data = response.json()
@@ -287,7 +287,7 @@ class TestStrategiesErrorHandling:
     def test_malformed_validation_params(self):
         """Test handling of malformed validation parameters."""
         # Test with missing required parameters
-        response = client.post("/api/v1/strategies/SMC/validate", json={})
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json={})
         assert response.status_code == 422  # Validation error
         
         # Test with invalid parameter types
@@ -295,15 +295,15 @@ class TestStrategiesErrorHandling:
             "timeframes": "invalid",  # Should be list
             "tf_roles": "invalid"     # Should be dict
         }
-        response = client.post("/api/v1/strategies/SMC/validate", json=params)
+        response = client.post("/api/v1/strategies/SMCSignalStrategy/validate", json=params)
         assert response.status_code == 422
     
     def test_strategy_name_encoding(self):
         """Test handling of special characters in strategy names."""
         # Test with URL-encoded strategy names
-        response = client.get("/api/v1/strategies/SMC%20Strategy")  # Space encoded
+        response = client.get("/api/v1/strategies/SMCSignalStrategy%20Strategy")  # Space encoded
         assert response.status_code == 404  # Should not exist
         
         # Test with strategy names that might have special characters
-        response = client.get("/api/v1/strategies/SMC-Strategy")  # Hyphen
+        response = client.get("/api/v1/strategies/SMCSignalStrategy-Strategy")  # Hyphen
         assert response.status_code == 404  # Should not exist

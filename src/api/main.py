@@ -1,6 +1,7 @@
 """Main FastAPI application."""
 
 import os
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -28,22 +29,31 @@ from src.startup import create_startup_event_handler, create_shutdown_event_hand
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
+    """Application lifespan manager with improved error handling."""
     # Startup
     print("🚀 Starting Trading Bot API...")
     
-    # Initialize application components
-    startup_handler = create_startup_event_handler()
-    await startup_handler()
+    try:
+        # Initialize application components
+        startup_handler = create_startup_event_handler()
+        await startup_handler()
+        print("✅ Application components initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize application: {e}")
+        raise
     
     yield
     
     # Shutdown
     print("🛑 Shutting down Trading Bot API...")
     
-    # Shutdown application components
-    shutdown_handler = create_shutdown_event_handler()
-    await shutdown_handler()
+    try:
+        # Shutdown application components
+        shutdown_handler = create_shutdown_event_handler()
+        await shutdown_handler()
+        print("✅ Application shutdown completed successfully")
+    except Exception as e:
+        print(f"⚠️ Error during shutdown: {e}")
 
 
 # Create FastAPI application
@@ -162,10 +172,16 @@ if __name__ == "__main__":
     print(f"📚 API Documentation: http://{host}:{port}/docs")
     print(f"🔄 Auto-reload: {reload}")
     
-    uvicorn.run(
-        "src.api.main:app",
-        host=host,
-        port=port,
-        reload=reload,
-        log_level="info"
-    )
+    try:
+        uvicorn.run(
+            "src.api.main:app",
+            host=host,
+            port=port,
+            reload=reload,
+            log_level="info"
+        )
+    except KeyboardInterrupt:
+        print("\n🛑 Server stopped by user")
+    except Exception as e:
+        print(f"❌ Server error: {e}")
+        raise
