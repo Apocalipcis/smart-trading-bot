@@ -1,0 +1,92 @@
+{
+  "name": "Custom SMC",
+  "description": "Custom configuration template - modify as needed",
+  "htf_timeframe": "4h",
+  "ltf_timeframe": "15m",
+  "scalping_mode": false,
+  "indicators": {
+    "rsi": {
+      "enabled": true,
+      "period": 14,
+      "overbought": 70,
+      "oversold": 30
+    },
+    "macd": {
+      "enabled": false,
+      "fast_period": 12,
+      "slow_period": 26,
+      "signal_period": 9
+    },
+    "bbands": {
+      "enabled": false,
+      "period": 20,
+      "deviation": 2.0
+    },
+    "stochastic": {
+      "enabled": false,
+      "k_period": 14,
+      "d_period": 3,
+      "overbought": 80,
+      "oversold": 20
+    },
+    "volume": {
+      "enabled": true,
+      "period": 20
+    },
+    "atr": {
+      "enabled": true,
+      "period": 14
+    }
+  },
+  "filters": {
+    "rsi": {
+      "enabled": true,
+      "min_confidence": 0.5,
+      "overbought": 70,
+      "oversold": 30
+    },
+    "volume": {
+      "enabled": true,
+      "min_volume_ratio": 1.0
+    },
+    "bbands": {
+      "enabled": false,
+      "position_threshold": 0.1
+    },
+    "macd": {
+      "enabled": false,
+      "signal_cross": true
+    },
+    "stochastic": {
+      "enabled": false,
+      "overbought": 80,
+      "oversold": 20
+    },
+    "min_filters_required": 2
+  },
+  "smc_elements": {
+    "order_blocks": {
+      "enabled": true,
+      "lookback_bars": 20,
+      "volume_threshold": 1.5
+    },
+    "fair_value_gaps": {
+      "enabled": true,
+      "min_gap_pct": 0.5
+    },
+    "liquidity_pools": {
+      "enabled": true,
+      "swing_threshold": 0.02
+    },
+    "break_of_structure": {
+      "enabled": true,
+      "confirmation_bars": 2
+    }
+  },
+  "risk_management": {
+    "risk_per_trade": 0.015,
+    "min_risk_reward": 3.0,
+    "max_positions": 3,
+    "sl_buffer_atr": 0.15
+  }
+}

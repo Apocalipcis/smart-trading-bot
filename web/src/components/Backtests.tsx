@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Trash2, Eye, BarChart3, AlertTriangle, X, Plus, Minus, Download, RefreshCw, Calendar } from 'lucide-react';
-import { BacktestConfig, BacktestResult, TradingPair, TimeframeRole, StrategyMetadata, AvailableTimeframes } from '../types/api';
+import { BacktestConfig, BacktestResult, TradingPair, TimeframeRole, StrategyMetadata, AvailableTimeframes, SMCConfiguration } from '../types/api';
 import apiClient from '../services/api';
+import SMCConfigurationComponent from './SMCConfiguration';
 
 const Backtests: React.FC = () => {
   const [backtests, setBacktests] = useState<BacktestResult[]>([]);
@@ -27,6 +28,11 @@ const Backtests: React.FC = () => {
   const [timeframeRoles, setTimeframeRoles] = useState<Record<string, TimeframeRole>>({});
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+
+  const [smcConfiguration, setSmcConfiguration] = useState<SMCConfiguration | undefined>(undefined);
+  const [showSMCConfig, setShowSMCConfig] = useState(false);
+  const [smcValidationErrors, setSmcValidationErrors] = useState<string[]>([]);
+  const [smcValidationWarnings, setSmcValidationWarnings] = useState<string[]>([]);
 
   // Helper functions to safely extract backtest data
   const getBacktestPairs = (backtest: BacktestResult): string => {
@@ -154,6 +160,46 @@ const Backtests: React.FC = () => {
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      pairs: [],
+      strategy: 'SMC',
+      timeframes: [],
+      tf_roles: {},
+      start_date: '',
+      end_date: '',
+      initial_balance: 10000,
+      risk_per_trade: 2,
+      leverage: 1,
+    });
+    setSelectedTimeframes([]);
+    setTimeframeRoles({});
+    setValidationErrors([]);
+    setValidationWarnings([]);
+    setSmcConfiguration(undefined);
+    setSmcValidationErrors([]);
+    setSmcValidationWarnings([]);
+  };
+
+  // SMC Configuration handlers
+  const handleSMCConfigurationChange = (config: SMCConfiguration) => {
+    setSmcConfiguration(config);
+    // Update form data with SMC configuration
+    setFormData(prev => ({
+      ...prev,
+      smc_configuration: config
+    }));
+  };
+
+  const handleSMCValidationChange = (isValid: boolean, errors: string[], warnings: string[]) => {
+    setSmcValidationErrors(errors);
+    setSmcValidationWarnings(warnings);
+  };
+
+  const toggleSMCConfiguration = () => {
+    setShowSMCConfig(!showSMCConfig);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -170,12 +216,21 @@ const Backtests: React.FC = () => {
       return;
     }
     
+    // Validate SMC configuration if SMC strategy is selected
+    if (formData.strategy === 'SMC' && smcConfiguration) {
+      if (smcValidationErrors.length > 0) {
+        setValidationErrors([...validationErrors, ...smcValidationErrors]);
+        return;
+      }
+    }
+    
     // Update form data with selected timeframes and roles
     const updatedFormData = {
       ...formData,
       pairs: formData.pairs,
       timeframes: selectedTimeframes,
       tf_roles: timeframeRoles,
+      smc_configuration: smcConfiguration, // Include SMC configuration
       // Ensure dates are in ISO format
       start_date: formData.start_date ? new Date(formData.start_date).toISOString() : '',
       end_date: formData.end_date ? new Date(formData.end_date).toISOString() : '',
@@ -236,24 +291,6 @@ const Backtests: React.FC = () => {
         setValidationErrors(['Failed to create backtest. Please check your configuration.']);
       }
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      pairs: [],
-      strategy: 'SMC',
-      timeframes: [],
-      tf_roles: {},
-      start_date: '',
-      end_date: '',
-      initial_balance: 10000,
-      risk_per_trade: 2,
-      leverage: 1,
-    });
-    setSelectedTimeframes([]);
-    setTimeframeRoles({});
-    setValidationErrors([]);
-    setValidationWarnings([]);
   };
 
   const handleTimeframeChange = (timeframes: string[]) => {
@@ -647,6 +684,36 @@ const Backtests: React.FC = () => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* SMC Configuration */}
+                {formData.strategy === 'SMC' && (
+                  <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-md font-medium text-gray-900 dark:text-white">SMC Strategy Configuration</h4>
+                      <button
+                        type="button"
+                        onClick={toggleSMCConfiguration}
+                        className="px-3 py-1 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        {showSMCConfig ? 'Hide Advanced Config' : 'Show Advanced Config'}
+                      </button>
+                    </div>
+                    
+                                         {showSMCConfig && (
+                       <SMCConfigurationComponent
+                         value={smcConfiguration}
+                         onChange={handleSMCConfigurationChange}
+                         onValidationChange={handleSMCValidationChange}
+                       />
+                     )}
+                    
+                    {!showSMCConfig && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Click "Show Advanced Config" to configure SMC strategy parameters, indicators, filters, and risk management settings.
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -202,6 +202,22 @@ class ApiClient {
     return response.data.data;
   }
 
+  // SMC Strategy Configuration Methods
+  async getSMCPresets(): Promise<string[]> {
+    const response = await this.client.get<any>('/api/v1/strategies/smc/presets');
+    return response.data.data.presets || [];
+  }
+
+  async getSMCPreset(presetName: string): Promise<any> {
+    const response = await this.client.get<any>(`/api/v1/strategies/smc/presets/${presetName}`);
+    return response.data.data;
+  }
+
+  async validateSMCConfiguration(config: any): Promise<any> {
+    const response = await this.client.post<any>('/api/v1/strategies/smc/validate', config);
+    return response.data.data;
+  }
+
   // Orders
   async getOrders(): Promise<Order[]> {
     const response = await this.client.get<ApiResponse<Order[]>>('/api/v1/orders');

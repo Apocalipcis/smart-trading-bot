@@ -1,7 +1,11 @@
 """Strategies router for strategy management and metadata."""
 
+import logging
+from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 from ..schemas import (
     StrategyInfo, 
@@ -226,3 +230,138 @@ def _timeframe_to_minutes(timeframe: str) -> int:
         return int(timeframe[:-1]) * 43200
     else:
         raise ValueError(f"Invalid timeframe format: {timeframe}")
+
+
+# SMC Strategy Configuration Presets
+import json
+import os
+from pathlib import Path
+
+def _get_smc_presets_path() -> Path:
+    """Get the path to SMC presets directory."""
+    # Get the project root directory using a more reliable method
+    # Current file: src/api/routers/strategies.py
+    # Need to go up 4 levels: routers -> api -> src -> project_root
+    project_root = Path(__file__).resolve().parents[3]
+    return project_root / "configs" / "smc_presets"
+
+def _load_smc_preset(preset_name: str) -> dict:
+    """Load SMC preset configuration from file."""
+    presets_path = _get_smc_presets_path()
+    preset_file = presets_path / f"{preset_name}.json"
+    
+    if not preset_file.exists():
+        raise FileNotFoundError(f"Preset '{preset_name}' not found")
+    
+    with open(preset_file, 'r') as f:
+        return json.load(f)
+
+def _get_available_smc_presets() -> List[str]:
+    """Get list of available SMC preset names."""
+    presets_path = _get_smc_presets_path()
+    if not presets_path.exists():
+        return []
+    
+    preset_files = list(presets_path.glob("*.json"))
+    return [f.stem for f in preset_files]
+
+@router.get("/smc/presets")
+async def get_smc_presets() -> APIResponse:
+    """Get list of available SMC configuration presets."""
+    try:
+        preset_names = _get_available_smc_presets()
+        return APIResponse(
+            success=True,
+            data={"presets": preset_names},
+            message=f"Found {len(preset_names)} SMC presets"
+        )
+    except Exception as e:
+        logger.error(f"Failed to load SMC presets: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load SMC presets: {str(e)}"
+        )
+
+@router.get("/smc/presets/{preset_name}")
+async def get_smc_preset(preset_name: str) -> APIResponse:
+    """Get specific SMC configuration preset."""
+    try:
+        preset_config = _load_smc_preset(preset_name)
+        return APIResponse(
+            success=True,
+            data=preset_config,
+            message=f"SMC preset '{preset_name}' loaded successfully"
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"SMC preset '{preset_name}' not found"
+        )
+    except Exception as e:
+        logger.error(f"Failed to load SMC preset '{preset_name}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load SMC preset: {str(e)}"
+        )
+
+@router.post("/smc/validate")
+async def validate_smc_configuration(config: dict) -> APIResponse:
+    """Validate SMC configuration parameters."""
+    try:
+        errors = []
+        warnings = []
+        
+        # Basic structure validation
+        required_sections = ['indicators', 'filters', 'smc_elements', 'risk_management']
+        for section in required_sections:
+            if section not in config:
+                errors.append(f"Missing required section: {section}")
+        
+        if errors:
+            return APIResponse(
+                success=False,
+                data={"valid": False, "errors": errors, "warnings": warnings},
+                message="SMC configuration validation failed"
+            )
+        
+        # Validate indicators section
+        indicators = config.get('indicators', {})
+        for indicator_name, indicator_config in indicators.items():
+            if indicator_config.get('enabled', False):
+                if 'period' in indicator_config:
+                    period = indicator_config['period']
+                    if not isinstance(period, int) or period < 1:
+                        errors.append(f"Invalid period for {indicator_name}: must be positive integer")
+        
+        # Validate filters section
+        filters = config.get('filters', {})
+        min_filters = filters.get('min_filters_required', 1)
+        if min_filters < 1:
+            errors.append("min_filters_required must be at least 1")
+        
+        # Validate risk management
+        risk_mgmt = config.get('risk_management', {})
+        risk_per_trade = risk_mgmt.get('risk_per_trade', 0)
+        if risk_per_trade <= 0 or risk_per_trade > 0.1:  # Max 10% risk per trade
+            warnings.append("risk_per_trade should be between 0.001 and 0.1 (0.1% to 10%)")
+        
+        min_risk_reward = risk_mgmt.get('min_risk_reward', 0)
+        if min_risk_reward < 1.0:
+            warnings.append("min_risk_reward should be at least 1.0")
+        
+        return APIResponse(
+            success=len(errors) == 0,
+            data={
+                "valid": len(errors) == 0,
+                "errors": errors,
+                "warnings": warnings
+            },
+            message="SMC configuration validation completed"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to validate SMC configuration: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate SMC configuration: {str(e)}"
+        )

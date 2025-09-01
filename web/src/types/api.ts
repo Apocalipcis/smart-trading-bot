@@ -85,6 +85,7 @@ export interface BacktestConfig {
   risk_per_trade: number;
   leverage: number;
   parameters?: Record<string, any>;
+  smc_configuration?: SMCConfiguration; // New field for SMC config
   
   // Legacy support
   pair_id?: string;
@@ -222,4 +223,87 @@ export interface PendingConfirmation {
   take_profit: number;
   created_at: string;
   expires_at: string;
+}
+
+// SMC Strategy Configuration Types
+export interface SMCIndicator {
+  enabled: boolean;
+  period?: number;
+  overbought?: number;
+  oversold?: number;
+  fast_period?: number;
+  slow_period?: number;
+  signal_period?: number;
+  deviation?: number;
+  k_period?: number;
+  d_period?: number;
+}
+
+export interface SMCFilter {
+  enabled: boolean;
+  min_confidence?: number;
+  overbought?: number;
+  oversold?: number;
+  min_volume_ratio?: number;
+  position_threshold?: number;
+  signal_cross?: boolean;
+}
+
+export interface SMCElement {
+  enabled: boolean;
+  lookback_bars?: number;
+  volume_threshold?: number;
+  min_gap_pct?: number;
+  swing_threshold?: number;
+  confirmation_bars?: number;
+}
+
+export interface SMCRiskManagement {
+  risk_per_trade: number;
+  min_risk_reward: number;
+  max_positions: number;
+  sl_buffer_atr: number;
+}
+
+export interface SMCConfiguration {
+  name: string;
+  description: string;
+  htf_timeframe: string;
+  ltf_timeframe: string;
+  scalping_mode: boolean;
+  indicators: {
+    rsi: SMCIndicator;
+    macd: SMCIndicator;
+    bbands: SMCIndicator;
+    stochastic: SMCIndicator;
+    volume: SMCIndicator;
+    atr: SMCIndicator;
+  };
+  filters: {
+    rsi: SMCFilter;
+    volume: SMCFilter;
+    bbands: SMCFilter;
+    macd: SMCFilter;
+    stochastic: SMCFilter;
+    min_filters_required: number;
+  };
+  smc_elements: {
+    order_blocks: SMCElement;
+    fair_value_gaps: SMCElement;
+    liquidity_pools: SMCElement;
+    break_of_structure: SMCElement;
+  };
+  risk_management: SMCRiskManagement;
+}
+
+export interface SMCPreset {
+  name: string;
+  description: string;
+  configuration: SMCConfiguration;
+}
+
+export interface SMCValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
 }

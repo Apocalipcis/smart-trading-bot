@@ -23,8 +23,10 @@ import backtrader as bt
 
 try:
     from src.strategies.base import BaseStrategy, Signal
+    from src.strategies.smc_config import SMCStrategyConfig, load_config_from_dict
 except ImportError:
     from .base import BaseStrategy, Signal
+    from .smc_config import SMCStrategyConfig, load_config_from_dict
 
 
 def handle_errors(func):
@@ -55,24 +57,27 @@ class SMCSignalStrategy(BaseStrategy):
         ('ltf_timeframe', '15m'),          # Lower timeframe (15M)
         ('scalping_mode', False),          # Enable M1-M5 scalping
         
-        # SMC Detection
+        # Configuration System
+        ('indicators_config', {}),         # Indicators configuration
+        ('filters_config', {}),            # Filters configuration
+        ('smc_config', {}),                # SMC elements configuration
+        ('risk_config', {}),               # Risk management configuration
+        
+        # Legacy Parameters (for backward compatibility)
         ('volume_ratio_threshold', 1.5),   # Volume expansion threshold
         ('fvg_min_pct', 0.5),             # Minimum FVG gap (0.5%)
         ('ob_lookback_bars', 20),         # Bars to look back for OBs
         ('swing_threshold', 0.02),         # Minimum swing size (2%)
-        
-        # Risk Management
         ('risk_per_trade', 0.01),          # 1% risk per trade
         ('min_risk_reward', 3.0),          # Minimum 3:1 R:R
         ('max_positions', 3),              # Max concurrent positions
         ('sl_buffer_atr', 0.15),           # SL buffer in ATR multiples
-        
-        # Indicator Filters
         ('use_rsi', True),                 # Enable RSI filter
         ('use_obv', True),                 # Enable OBV filter
         ('use_bbands', False),             # Enable Bollinger Bands filter
         ('rsi_overbought', 70),            # RSI overbought threshold
         ('rsi_oversold', 30),              # RSI oversold threshold
+        ('quiet_mode', False),             # Suppress processing logs
     )
     
     required_roles = ['HTF', 'LTF']
@@ -95,6 +100,11 @@ class SMCSignalStrategy(BaseStrategy):
     def __init__(self):
         """Initialize the SMC Signal Strategy."""
         super().__init__()
+        
+        # Load configuration
+        self._load_configuration()
+        
+        # Initialize indicators based on configuration
         self._init_indicators()
         
         # HTF State
@@ -111,31 +121,119 @@ class SMCSignalStrategy(BaseStrategy):
         # Performance tracking
         self.total_signals = 0
         self.successful_signals = 0
+        self.last_signal_bar = 0  # Track last signal generation
+        self.min_bars_between_signals = 25  # Minimum bars between signals (increased)
         
         if not self.validate_multi_timeframe_setup():
             raise ValueError("Invalid multi-timeframe setup. Need HTF and LTF data feeds.")
     
+    def _load_configuration(self):
+        """Load and validate configuration."""
+        # Try to load from configuration parameters first
+        if self.params.indicators_config and self.params.filters_config:
+            self.config = load_config_from_dict({
+                'indicators': self.params.indicators_config,
+                'filters': self.params.filters_config,
+                'smc_elements': self.params.smc_config,
+                'risk_management': self.params.risk_config
+            })
+        else:
+            # Use default configuration
+            self.config = SMCStrategyConfig.get_default_config()
+        
+        # Override with legacy parameters if provided
+        self._apply_legacy_parameters()
+    
+    def _apply_legacy_parameters(self):
+        """Apply legacy parameters to configuration for backward compatibility."""
+        # Override indicators if legacy params are set
+        if hasattr(self.params, 'use_rsi') and self.params.use_rsi:
+            self.config.indicators.rsi.enabled = True
+            if hasattr(self.params, 'rsi_overbought'):
+                self.config.indicators.rsi.overbought = self.params.rsi_overbought
+            if hasattr(self.params, 'rsi_oversold'):
+                self.config.indicators.rsi.oversold = self.params.rsi_oversold
+        
+        if hasattr(self.params, 'use_bbands') and self.params.use_bbands:
+            self.config.indicators.bbands.enabled = True
+        
+        # Override risk management if legacy params are set
+        if hasattr(self.params, 'risk_per_trade'):
+            self.config.risk_management.risk_per_trade = self.params.risk_per_trade
+        if hasattr(self.params, 'min_risk_reward'):
+            self.config.risk_management.min_risk_reward = self.params.min_risk_reward
+        if hasattr(self.params, 'max_positions'):
+            self.config.risk_management.max_positions = self.params.max_positions
+        if hasattr(self.params, 'sl_buffer_atr'):
+            self.config.risk_management.sl_buffer_atr = self.params.sl_buffer_atr
+    
     def _init_indicators(self):
-        """Initialize technical indicators for both HTF and LTF."""
+        """Initialize technical indicators based on configuration."""
         htf_data = self.get_htf_data()
         ltf_data = self.get_ltf_data()
         
         if htf_data is None or ltf_data is None:
             raise ValueError("HTF and LTF data feeds not available")
         
-        # HTF Indicators
+        # HTF Indicators (always enabled)
         self.htf_ema_50 = bt.indicators.ExponentialMovingAverage(htf_data.close, period=50)
         self.htf_volume_sma = bt.indicators.SimpleMovingAverage(htf_data.volume, period=20)
         self.htf_atr = bt.indicators.ATR(htf_data, period=14)
         
-        # LTF Indicators
-        self.ltf_rsi = bt.indicators.RSI(ltf_data.close, period=14)
-        self.ltf_volume_sma = bt.indicators.SimpleMovingAverage(ltf_data.volume, period=20)
-        self.ltf_atr = bt.indicators.ATR(ltf_data, period=14)
+        # LTF Indicators - based on configuration
+        indicators_config = self.config.indicators
         
-        # Optional Bollinger Bands
-        if self.params.use_bbands:
-            self.ltf_bbands = bt.indicators.BollingerBands(ltf_data.close, period=20, devfactor=2)
+        # RSI
+        if indicators_config.rsi.enabled:
+            self.ltf_rsi = bt.indicators.RSI(ltf_data.close, period=indicators_config.rsi.period)
+        else:
+            self.ltf_rsi = None
+        
+        # MACD
+        if indicators_config.macd.enabled:
+            self.ltf_macd = bt.indicators.MACD(
+                ltf_data.close,
+                period_me1=indicators_config.macd.fast_period,
+                period_me2=indicators_config.macd.slow_period,
+                period_signal=indicators_config.macd.signal_period
+            )
+        else:
+            self.ltf_macd = None
+        
+        # Bollinger Bands
+        if indicators_config.bbands.enabled:
+            self.ltf_bbands = bt.indicators.BollingerBands(
+                ltf_data.close, 
+                period=indicators_config.bbands.period, 
+                devfactor=indicators_config.bbands.deviation
+            )
+        else:
+            self.ltf_bbands = None
+        
+        # Stochastic
+        if indicators_config.stochastic.enabled:
+            self.ltf_stochastic = bt.indicators.Stochastic(
+                ltf_data,
+                period=indicators_config.stochastic.k_period,
+                period_d=indicators_config.stochastic.d_period
+            )
+        else:
+            self.ltf_stochastic = None
+        
+        # Volume SMA
+        if indicators_config.volume.enabled:
+            self.ltf_volume_sma = bt.indicators.SimpleMovingAverage(
+                ltf_data.volume, 
+                period=indicators_config.volume.period
+            )
+        else:
+            self.ltf_volume_sma = None
+        
+        # ATR
+        if indicators_config.atr.enabled:
+            self.ltf_atr = bt.indicators.ATR(ltf_data, period=indicators_config.atr.period)
+        else:
+            self.ltf_atr = None
     
     def _convert_to_dataframe(self, data_feed, max_bars=500) -> pd.DataFrame:
         """Convert backtrader data to pandas DataFrame."""
@@ -179,12 +277,18 @@ class SMCSignalStrategy(BaseStrategy):
     @handle_errors
     def detect_order_blocks_htf(self) -> List[Dict]:
         """Detect order blocks on HTF."""
+        # Check if order blocks are enabled in configuration
+        if not self.config.smc_elements.order_blocks.enabled:
+            return []
+        
         df = self._convert_to_dataframe(self.get_htf_data(), 100)
         if df.empty or len(df) < 5:
             return []
         
         obs = []
-        lookback = min(self.params.ob_lookback_bars, len(df) - 1)
+        config = self.config.smc_elements.order_blocks
+        lookback = min(config.lookback_bars, len(df) - 1)
+        volume_threshold = config.volume_threshold
         
         for i in range(lookback, len(df) - 1):
             try:
@@ -195,11 +299,11 @@ class SMCSignalStrategy(BaseStrategy):
                 avg_volume = df['volume'].rolling(20).mean().iloc[i]
                 volume_ratio = current_bar['volume'] / avg_volume if avg_volume > 0 else 1.0
                 
-                # Check for bullish order block
-                if (current_bar['close'] < current_bar['open'] and
-                    next_bar['close'] > next_bar['open'] and
-                    next_bar['close'] > current_bar['high'] and
-                    volume_ratio > self.params.volume_ratio_threshold):
+                # Check for bullish order block (bearish candle followed by bullish move)
+                if (current_bar['close'] < current_bar['open'] and  # Bearish candle
+                    next_bar['close'] > next_bar['open'] and      # Next candle bullish
+                    next_bar['close'] > current_bar['high'] and   # Break above high
+                    volume_ratio > volume_threshold):
                     
                     obs.append({
                         'id': f"OB_bull_{i}",
@@ -210,11 +314,11 @@ class SMCSignalStrategy(BaseStrategy):
                         'volume_ratio': volume_ratio, 'timestamp': current_bar.name
                     })
                 
-                # Check for bearish order block
-                elif (current_bar['close'] > current_bar['open'] and
-                      next_bar['close'] < next_bar['open'] and
-                      next_bar['close'] < current_bar['low'] and
-                      volume_ratio > self.params.volume_ratio_threshold):
+                # Check for bearish order block (bullish candle followed by bearish move)
+                elif (current_bar['close'] > current_bar['open'] and  # Bullish candle
+                      next_bar['close'] < next_bar['open'] and      # Next candle bearish
+                      next_bar['close'] < current_bar['low'] and    # Break below low
+                      volume_ratio > volume_threshold):
                     
                     obs.append({
                         'id': f"OB_bear_{i}",
@@ -233,12 +337,17 @@ class SMCSignalStrategy(BaseStrategy):
     @handle_errors
     def detect_fair_value_gaps_htf(self) -> List[Dict]:
         """Detect fair value gaps on HTF."""
+        # Check if fair value gaps are enabled in configuration
+        if not self.config.smc_elements.fair_value_gaps.enabled:
+            return []
+        
         df = self._convert_to_dataframe(self.get_htf_data(), 100)
         if df.empty or len(df) < 3:
             return []
         
         fvgs = []
-        min_gap_pct = self.params.fvg_min_pct / 100
+        config = self.config.smc_elements.fair_value_gaps
+        min_gap_pct = config.min_gap_pct / 100
         
         for i in range(2, len(df)):
             try:
@@ -275,12 +384,17 @@ class SMCSignalStrategy(BaseStrategy):
     @handle_errors
     def detect_liquidity_pools_htf(self) -> List[Dict]:
         """Detect liquidity pools (swing highs/lows) on HTF."""
+        # Check if liquidity pools are enabled in configuration
+        if not self.config.smc_elements.liquidity_pools.enabled:
+            return []
+        
         df = self._convert_to_dataframe(self.get_htf_data(), 100)
         if df.empty or len(df) < 5:
             return []
         
         pools = []
-        swing_threshold = self.params.swing_threshold
+        config = self.config.smc_elements.liquidity_pools
+        swing_threshold = config.swing_threshold
         
         for i in range(2, len(df) - 2):
             try:
@@ -347,124 +461,241 @@ class SMCSignalStrategy(BaseStrategy):
         return False
     
     def _check_filters(self, direction: str) -> Tuple[bool, List[str]]:
-        """Check all filters and return (passed, passed_filters_list)."""
+        """Check all filters based on configuration and return (passed, passed_filters_list)."""
         passed_filters = []
+        filters_config = self.config.filters
         
         # RSI filter
-        if self.params.use_rsi and len(self.ltf_rsi) > 0:
-            current_rsi = self.ltf_rsi[0]
-            if direction == 'long' and current_rsi <= self.params.rsi_overbought:
+        if filters_config.rsi.enabled and self.ltf_rsi is not None and len(self.ltf_rsi) > 0:
+            if self._check_rsi_filter(direction, filters_config.rsi):
                 passed_filters.append('rsi')
-            elif direction == 'short' and current_rsi >= self.params.rsi_oversold:
-                passed_filters.append('rsi')
-        else:
-            passed_filters.append('rsi')
         
         # Volume filter
-        if len(self.ltf_volume_sma) > 0:
-            current_volume = self.get_ltf_data().volume[0]
-            avg_volume = self.ltf_volume_sma[0]
-            if avg_volume > 0 and current_volume / avg_volume >= 1.0:
+        if filters_config.volume.enabled and self.ltf_volume_sma is not None and len(self.ltf_volume_sma) > 0:
+            if self._check_volume_filter(filters_config.volume):
                 passed_filters.append('volume')
-        else:
-            passed_filters.append('volume')
-        
-        # OBV filter (temporarily disabled)
-        if self.params.use_obv:
-            passed_filters.append('obv')
         
         # Bollinger Bands filter
-        if self.params.use_bbands and len(self.ltf_bbands) > 0:
-            current_price = self.get_ltf_data().close[0]
-            upper_band = self.ltf_bbands.lines.top[0]
-            lower_band = self.ltf_bbands.lines.bot[0]
-            if lower_band <= current_price <= upper_band:
+        if filters_config.bbands.enabled and self.ltf_bbands is not None and len(self.ltf_bbands) > 0:
+            if self._check_bbands_filter(filters_config.bbands):
                 passed_filters.append('bbands')
-        else:
-            passed_filters.append('bbands')
         
-        passed = len(passed_filters) >= 3  # At least 3 filters must pass
+        # MACD filter
+        if filters_config.macd.enabled and self.ltf_macd is not None and len(self.ltf_macd) > 0:
+            if self._check_macd_filter(direction, filters_config.macd):
+                passed_filters.append('macd')
+        
+        # Stochastic filter
+        if filters_config.stochastic.enabled and self.ltf_stochastic is not None and len(self.ltf_stochastic) > 0:
+            if self._check_stochastic_filter(direction, filters_config.stochastic):
+                passed_filters.append('stochastic')
+        
+        # Check if we have enough filters passing
+        min_filters = filters_config.min_filters_required
+        passed = len(passed_filters) >= min_filters
         return passed, passed_filters
+    
+    def _check_rsi_filter(self, direction: str, config) -> bool:
+        """Check RSI filter based on configuration."""
+        if self.ltf_rsi is None or len(self.ltf_rsi) == 0:
+            return False
+        
+        current_rsi = self.ltf_rsi[0]
+        
+        if direction == 'bullish':
+            return current_rsi <= config.overbought
+        elif direction == 'bearish':
+            return current_rsi >= config.oversold
+        
+        return False
+    
+    def _check_volume_filter(self, config) -> bool:
+        """Check volume filter based on configuration."""
+        if self.ltf_volume_sma is None or len(self.ltf_volume_sma) == 0:
+            return False
+        
+        try:
+            current_volume = self.get_ltf_data().volume[0]
+            avg_volume = self.ltf_volume_sma[0]
+            if avg_volume > 0:
+                volume_ratio = current_volume / avg_volume
+                return volume_ratio >= config.min_volume_ratio
+        except:
+            pass
+        
+        return False
+    
+    def _check_bbands_filter(self, config) -> bool:
+        """Check Bollinger Bands filter based on configuration."""
+        if self.ltf_bbands is None or len(self.ltf_bbands) == 0:
+            return False
+        
+        try:
+            current_price = self.get_ltf_data().close[0]
+            bb_upper = self.ltf_bbands.lines.top[0]
+            bb_lower = self.ltf_bbands.lines.bot[0]
+            
+            # Check if price is within the bands
+            if bb_upper > bb_lower:
+                position = (current_price - bb_lower) / (bb_upper - bb_lower)
+                return position >= config.position_threshold
+        except:
+            pass
+        
+        return False
+    
+    def _check_macd_filter(self, direction: str, config) -> bool:
+        """Check MACD filter based on configuration."""
+        if self.ltf_macd is None or len(self.ltf_macd) == 0:
+            return False
+        
+        try:
+            macd_line = self.ltf_macd.lines.macd[0]
+            signal_line = self.ltf_macd.lines.signal[0]
+            
+            if config.signal_cross:
+                # Check for MACD crossing above/below signal line
+                if direction == 'bullish':
+                    return macd_line > signal_line
+                elif direction == 'bearish':
+                    return macd_line < signal_line
+            
+            return True
+        except:
+            pass
+        
+        return False
+    
+    def _check_stochastic_filter(self, direction: str, config) -> bool:
+        """Check Stochastic filter based on configuration."""
+        if self.ltf_stochastic is None or len(self.ltf_stochastic) == 0:
+            return False
+        
+        try:
+            k_line = self.ltf_stochastic.lines.percK[0]
+            
+            if direction == 'bullish':
+                return k_line <= config.oversold
+            elif direction == 'bearish':
+                return k_line >= config.overbought
+            
+            return True
+        except:
+            pass
+        
+        return False
     
     def _calculate_signal_confidence(self, direction: str, passed_filters: List[str]) -> float:
         """Calculate signal confidence based on multiple factors."""
-        confidence = 0.5  # Base confidence
+        confidence = 0.3  # Lower base confidence
         
-        # Filter contributions
-        confidence += len(passed_filters) * 0.1
+        # Filter contributions (more weight)
+        confidence += len(passed_filters) * 0.15
         
-        # HTF trend alignment
-        if direction == 'long' and self.htf_trend == 'bullish':
-            confidence += 0.1
-        elif direction == 'short' and self.htf_trend == 'bearish':
-            confidence += 0.1
+        # HTF trend alignment (more weight)
+        if direction == 'bullish' and self.htf_trend == 'bullish':
+            confidence += 0.2
+        elif direction == 'bearish' and self.htf_trend == 'bearish':
+            confidence += 0.2
         
-        # SMC confirmations
+        # SMC confirmations (more weight)
         if self.detect_liquidity_sweep_ltf():
-            confidence += 0.1
+            confidence += 0.15
         if self.detect_bos_ltf(direction):
-            confidence += 0.1
+            confidence += 0.15
         
         return min(confidence, 1.0)
     
     def _compute_sl_tp(self, entry: float, direction: str, ob: Dict) -> Tuple[float, float]:
         """Compute stop loss and take profit levels."""
         try:
-            atr = self.ltf_atr[0] if len(self.ltf_atr) > 0 else 0.01
-            buffer = atr * self.params.sl_buffer_atr
+            risk_config = self.config.risk_management
             
-            if direction == 'long':
+            if self.ltf_atr is not None and len(self.ltf_atr) > 0:
+                atr = self.ltf_atr[0]
+                buffer = atr * risk_config.sl_buffer_atr
+            else:
+                # Fallback to percentage-based buffer
+                buffer = entry * 0.02  # 2% buffer
+            
+            if direction == 'bullish':
                 stop_loss = ob['low'] - buffer
                 risk = entry - stop_loss
-                take_profit = entry + (risk * self.params.min_risk_reward)
-            else:
+                take_profit = entry + (risk * risk_config.min_risk_reward)
+            else:  # bearish
                 stop_loss = ob['high'] + buffer
                 risk = stop_loss - entry
-                take_profit = entry - (risk * self.params.min_risk_reward)
+                take_profit = entry - (risk * risk_config.min_risk_reward)
             
             return stop_loss, take_profit
         except Exception:
             # Fallback values
-            return (entry * 0.99, entry * 1.03) if direction == 'long' else (entry * 1.01, entry * 0.97)
+            return (entry * 0.99, entry * 1.03) if direction == 'bullish' else (entry * 1.01, entry * 0.97)
     
     def _generate_signal(self, direction: str) -> Optional[Signal]:
         """Generate a trading signal for the given direction."""
-        # Find matching order blocks
-        obs = [ob for ob in self.htf_order_blocks if ob['type'] == direction]
-        if not obs:
-            return None
-        
-        ob = obs[-1]  # Use most recent
         current_price = self.get_ltf_data().close[0]
         
-        # Check if price is near the order block
-        ob_mid = (ob['high'] + ob['low']) / 2
-        if abs(current_price - ob_mid) / ob_mid > 0.02:
-            return None
+        # Try to find matching order blocks first
+        obs = [ob for ob in self.htf_order_blocks if ob['type'] == direction]
+        
+        if obs:
+            # Use order block if available
+            ob = obs[-1]  # Use most recent
+            
+            # Check if price is near the order block
+            ob_mid = (ob['high'] + ob['low']) / 2
+            if abs(current_price - ob_mid) / ob_mid > 0.03:  # Increased tolerance
+                return None
+            
+            # Calculate entry, stop loss, and take profit
+            entry = current_price
+            stop_loss, take_profit = self._compute_sl_tp(entry, direction, ob)
+            zone_type = 'OrderBlock'
+            ob_id = ob['id']
+        else:
+            # Fallback: create signal without order block
+            entry = current_price
+            risk_config = self.config.risk_management
+            
+            if self.ltf_atr is not None and len(self.ltf_atr) > 0:
+                atr = self.ltf_atr[0]
+                buffer = atr * risk_config.sl_buffer_atr
+            else:
+                buffer = current_price * 0.02  # 2% buffer
+            
+            if direction == 'bullish':
+                stop_loss = entry - buffer
+                risk = buffer
+                take_profit = entry + (risk * risk_config.min_risk_reward)
+            else:  # bearish
+                stop_loss = entry + buffer
+                risk = buffer
+                take_profit = entry - (risk * risk_config.min_risk_reward)
+            
+            zone_type = 'PriceAction'
+            ob_id = 'PA_fallback'
         
         # Check filters
         filters_passed, passed_filters = self._check_filters(direction)
         if not filters_passed:
             return None
         
-        # Calculate entry, stop loss, and take profit
-        entry = current_price
-        stop_loss, take_profit = self._compute_sl_tp(entry, direction, ob)
-        
         # Calculate confidence
         confidence = self._calculate_signal_confidence(direction, passed_filters)
-        if confidence < 0.5:
+        min_confidence = self.config.filters.min_filters_required * 0.1  # Dynamic minimum confidence
+        if confidence < min_confidence:
             return None
         
         # Generate metadata
         metadata = {
             'strategy': 'SMCSignalStrategy',
             'htf_trend': self.htf_trend,
-            'matched_ob_id': ob['id'],
+            'matched_ob_id': ob_id,
             'liquidity_sweep': self.detect_liquidity_sweep_ltf(),
             'bos_confirmation': self.detect_bos_ltf(direction),
             'filters_passed': passed_filters,
-            'htf_zone_type': 'OrderBlock'
+            'htf_zone_type': zone_type
         }
         
         return Signal(
@@ -486,7 +717,17 @@ class SMCSignalStrategy(BaseStrategy):
         
         if (htf_data is None or ltf_data is None or 
             len(htf_data) < 50 or len(ltf_data) < 20 or
-            len(self.htf_ema_50) == 0 or len(self.ltf_rsi) == 0):
+            len(self.htf_ema_50) == 0):
+            return signals
+        
+        # Check signal frequency - don't generate signals too often
+        current_bar = len(ltf_data)
+        if current_bar - self.last_signal_bar < self.min_bars_between_signals:
+            return signals
+        
+        # Check if we have at least one enabled indicator
+        if (self.ltf_rsi is None and self.ltf_macd is None and 
+            self.ltf_bbands is None and self.ltf_stochastic is None):
             return signals
         
         # Update HTF state
@@ -499,20 +740,38 @@ class SMCSignalStrategy(BaseStrategy):
             print(f"SMC Strategy Error updating HTF state: {e}")
             return signals
         
-        # Generate signals based on current conditions
-        if self.htf_trend == 'bullish' and self.htf_order_blocks:
+        # Generate signals based on current conditions - more selective
+        if self.htf_trend == 'bullish':
             signal = self._generate_signal('bullish')
-            if signal:
+            if signal and signal.confidence >= 0.8:  # Only very high confidence signals
                 signals.append(signal)
-                print(f"SMC Strategy: Generated BULLISH signal - Entry: {signal.entry:.2f}, SL: {signal.stop_loss:.2f}, TP: {signal.take_profit:.2f}, Confidence: {signal.confidence:.2f}")
         
-        elif self.htf_trend == 'bearish' and self.htf_order_blocks:
+        elif self.htf_trend == 'bearish':
             signal = self._generate_signal('bearish')
-            if signal:
+            if signal and signal.confidence >= 0.8:  # Only very high confidence signals
                 signals.append(signal)
-                print(f"SMC Strategy: Generated BEARISH signal - Entry: {signal.entry:.2f}, SL: {signal.stop_loss:.2f}, TP: {signal.take_profit:.2f}, Confidence: {signal.confidence:.2f}")
         
-        self.total_signals += len(signals)
+        # Fallback: generate signals only for extremely high quality setups
+        if not signals and len(self.htf_order_blocks) > 0:
+            # Try to generate signals based on order blocks, but only extremely high confidence ones
+            for ob in self.htf_order_blocks[-1:]:  # Only last order block
+                direction = ob['type']
+                signal = self._generate_signal(direction)
+                if signal and signal.confidence >= 0.9:  # Extremely high confidence required for fallback
+                    signals.append(signal)
+        
+        # Log summary instead of individual signals
+        if signals:
+            print(f"SMC Strategy: Generated {len(signals)} signal(s) - Confidence range: {min(s.confidence for s in signals):.2f}-{max(s.confidence for s in signals):.2f}")
+            for signal in signals:
+                print(f"  {signal.side.upper()}: Entry {signal.entry:.2f}, SL {signal.stop_loss:.2f}, TP {signal.take_profit:.2f}, Conf {signal.confidence:.2f}")
+        elif not self.params.quiet_mode and len(ltf_data) % 100 == 0:  # Progress indicator every 100 bars (less frequent)
+            print(f"SMC Strategy: Processing bar {len(ltf_data)} - No signals generated (confidence too low)")
+        
+        if signals:
+            self.last_signal_bar = len(ltf_data)
+            self.total_signals += len(signals)
+        
         return signals
     
     def get_strategy_stats(self) -> Dict[str, Any]:
@@ -527,8 +786,32 @@ class SMCSignalStrategy(BaseStrategy):
                 'ltf_swings_count': len(self.ltf_swings),
                 'ltf_bos_events_count': len(self.ltf_bos_events),
                 'ltf_liquidity_sweeps_count': len(self.ltf_liquidity_sweeps),
-                'current_rsi': float(self.ltf_rsi[0]) if len(self.ltf_rsi) > 0 else None,
-                'current_volume_ratio': float(self.get_ltf_data().volume[0] / self.ltf_volume_sma[0]) if len(self.ltf_volume_sma) > 0 else None,
+                'current_rsi': float(self.ltf_rsi[0]) if self.ltf_rsi is not None and len(self.ltf_rsi) > 0 else None,
+                'current_volume_ratio': float(self.get_ltf_data().volume[0] / self.ltf_volume_sma[0]) if self.ltf_volume_sma is not None and len(self.ltf_volume_sma) > 0 else None,
+                'configuration': {
+                    'name': self.config.name,
+                    'indicators_enabled': sum([
+                        self.config.indicators.rsi.enabled,
+                        self.config.indicators.macd.enabled,
+                        self.config.indicators.bbands.enabled,
+                        self.config.indicators.stochastic.enabled,
+                        self.config.indicators.volume.enabled,
+                        self.config.indicators.atr.enabled
+                    ]),
+                    'filters_enabled': sum([
+                        self.config.filters.rsi.enabled,
+                        self.config.filters.volume.enabled,
+                        self.config.filters.bbands.enabled,
+                        self.config.filters.macd.enabled,
+                        self.config.filters.stochastic.enabled
+                    ]),
+                    'smc_elements_enabled': sum([
+                        self.config.smc_elements.order_blocks.enabled,
+                        self.config.smc_elements.fair_value_gaps.enabled,
+                        self.config.smc_elements.liquidity_pools.enabled,
+                        self.config.smc_elements.break_of_structure.enabled
+                    ])
+                }
             }
             base_stats.update(smc_stats)
             return base_stats
@@ -540,10 +823,13 @@ class SMCSignalStrategy(BaseStrategy):
         try:
             super().stop()
             print(f"SMC Strategy Statistics:")
+            print(f"  Configuration: {self.config.name}")
             print(f"  HTF Market Trend: {self.htf_trend}")
             print(f"  HTF Order Blocks: {len(self.htf_order_blocks)}")
             print(f"  HTF Fair Value Gaps: {len(self.htf_fair_value_gaps)}")
             print(f"  HTF Liquidity Pools: {len(self.htf_liquidity_pools)}")
             print(f"  Total Signals Generated: {self.total_signals}")
+            print(f"  Indicators Enabled: {sum([self.config.indicators.rsi.enabled, self.config.indicators.macd.enabled, self.config.indicators.bbands.enabled, self.config.indicators.stochastic.enabled, self.config.indicators.volume.enabled, self.config.indicators.atr.enabled])}")
+            print(f"  Filters Enabled: {sum([self.config.filters.rsi.enabled, self.config.filters.volume.enabled, self.config.filters.bbands.enabled, self.config.filters.macd.enabled, self.config.filters.stochastic.enabled])}")
         except Exception:
             pass

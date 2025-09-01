@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Demo script for SMCSignalStrategy
+Demo script for SMC Strategy Configuration System
 
-This script demonstrates how to use the Signal-Only SMC Strategy
-with multi-timeframe data feeds and the new configuration system.
+This script demonstrates how to use the new configurable SMC Strategy
+with different configurations loaded from JSON files.
 """
 
 import sys
 import os
+import json
 import pandas as pd
 import backtrader as bt
 from datetime import datetime, timedelta
@@ -69,9 +70,28 @@ def create_sample_data(symbol: str, timeframe: str, bars: int = 1000) -> pd.Data
     return df
 
 
-def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
-    """Run the SMC Signal Strategy demo with a specific configuration."""
-    print(f"\n=== {config_name.upper()} Configuration Demo ===")
+def load_configuration_presets():
+    """Load all available configuration presets."""
+    configs_dir = os.path.join(os.path.dirname(__file__), '..', 'configs', 'smc_presets')
+    
+    configs = {}
+    for filename in os.listdir(configs_dir):
+        if filename.endswith('.json'):
+            config_name = filename.replace('.json', '')
+            config_path = os.path.join(configs_dir, filename)
+            try:
+                config = load_config_from_json(config_path)
+                configs[config_name] = config
+                print(f"✓ Loaded {config_name} configuration")
+            except Exception as e:
+                print(f"✗ Failed to load {config_name} configuration: {e}")
+    
+    return configs
+
+
+def run_backtest_with_config(config: SMCStrategyConfig, config_name: str):
+    """Run backtest with a specific configuration."""
+    print(f"\n=== Testing {config_name.upper()} Configuration ===")
     print(f"Description: {config.description}")
     print(f"Timeframes: {config.htf_timeframe} / {config.ltf_timeframe}")
     print(f"Scalping Mode: {config.scalping_mode}")
@@ -98,9 +118,6 @@ def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
         name='LTF'
     )
     
-    print(f"HTF data: {len(htf_data)} bars ({config.htf_timeframe})")
-    print(f"LTF data: {len(ltf_data)} bars ({config.ltf_timeframe})")
-    
     # Create Cerebro engine
     cerebro = bt.Cerebro()
     
@@ -120,14 +137,6 @@ def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
         'quiet_mode': True  # Reduce log spam during demo
     }
     
-    print(f"\nStrategy parameters from configuration:")
-    print(f"  RSI enabled: {config.indicators.rsi.enabled}, period: {config.indicators.rsi.period}")
-    print(f"  MACD enabled: {config.indicators.macd.enabled}")
-    print(f"  Bollinger Bands enabled: {config.indicators.bbands.enabled}")
-    print(f"  Stochastic enabled: {config.indicators.stochastic.enabled}")
-    print(f"  Risk per trade: {config.risk_management.risk_per_trade:.1%}")
-    print(f"  Min risk-reward: {config.risk_management.min_risk_reward}:1")
-    
     # Add strategy
     cerebro.addstrategy(SMCSignalStrategy, **strategy_params)
     
@@ -135,17 +144,14 @@ def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
     initial_cash = 10000.0
     cerebro.broker.setcash(initial_cash)
     
-    print(f"\nInitial cash: ${initial_cash:,.2f}")
-    
     # Run backtest
-    print("\nRunning backtest...")
     try:
         results = cerebro.run()
         strategy = results[0]
         
-        print("\n=== Backtest Results ===")
-        print(f"Final cash: ${cerebro.broker.getcash():,.2f}")
-        print(f"Total return: {((cerebro.broker.getcash() / initial_cash - 1) * 100):.2f}%")
+        print(f"\nBacktest Results:")
+        print(f"  Final cash: ${cerebro.broker.getcash():,.2f}")
+        print(f"  Total return: {((cerebro.broker.getcash() / initial_cash - 1) * 100):.2f}%")
         
         # Get strategy statistics
         stats = strategy.get_strategy_stats()
@@ -164,7 +170,7 @@ def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
         # Show generated signals
         if strategy.signals:
             print(f"\nGenerated Signals ({len(strategy.signals)}):")
-            for i, signal in enumerate(strategy.signals[-5:], 1):  # Show last 5 signals
+            for i, signal in enumerate(strategy.signals[-3:], 1):  # Show last 3 signals
                 print(f"  Signal {i}:")
                 print(f"    Side: {signal.side}")
                 print(f"    Entry: ${signal.entry:.2f}")
@@ -172,11 +178,8 @@ def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
                 print(f"    Take Profit: ${signal.take_profit:.2f}")
                 print(f"    Confidence: {signal.confidence:.2f}")
                 print(f"    HTF Zone: {signal.metadata.get('htf_zone_type', 'unknown')}")
-                print(f"    Liquidity Sweep: {signal.metadata.get('liquidity_sweep', False)}")
-                print(f"    BoS Confirmation: {signal.metadata.get('bos_confirmation', False)}")
                 print(f"    Filters Passed: {signal.metadata.get('filters_passed', [])}")
         
-        print(f"\n=== {config_name} Configuration Demo Completed Successfully ===")
         return True
         
     except Exception as e:
@@ -186,47 +189,34 @@ def run_demo_with_config(config: SMCStrategyConfig, config_name: str):
         return False
 
 
-def run_demo():
-    """Run the SMC Signal Strategy demo with different configurations."""
-    print("=== SMC Signal Strategy Demo ===\n")
+def demo_configuration_system():
+    """Demonstrate the configuration system."""
+    print("=== SMC Strategy Configuration System Demo ===\n")
     
-    # Try to load configurations from JSON files
-    configs_dir = os.path.join(os.path.dirname(__file__), '..', 'configs', 'smc_presets')
-    configs = {}
+    # Load configuration presets
+    print("Loading configuration presets...")
+    configs = load_configuration_presets()
     
-    if os.path.exists(configs_dir):
-        print("Loading configuration presets...")
-        for filename in os.listdir(configs_dir):
-            if filename.endswith('.json'):
-                config_name = filename.replace('.json', '')
-                config_path = os.path.join(configs_dir, filename)
-                try:
-                    config = load_config_from_json(config_path)
-                    configs[config_name] = config
-                    print(f"✓ Loaded {config_name} configuration")
-                except Exception as e:
-                    print(f"✗ Failed to load {config_name} configuration: {e}")
-    
-    # If no configurations loaded, use built-in ones
     if not configs:
-        print("No configurations found. Using built-in configurations...")
+        print("No configurations found. Creating default configurations...")
         configs = {
             'default': SMCStrategyConfig.get_default_config(),
             'conservative': SMCStrategyConfig.get_conservative_config(),
-            'aggressive': SMCStrategyConfig.get_aggressive_config()
+            'aggressive': SMCStrategyConfig.get_aggressive_config(),
+            'scalping': SMCStrategyConfig.get_scalping_config()
         }
     
-    print(f"\nAvailable configurations: {list(configs.keys())}")
+    print(f"\nLoaded {len(configs)} configurations: {list(configs.keys())}")
     
     # Test each configuration
     successful_tests = 0
     total_tests = len(configs)
     
     for config_name, config in configs.items():
-        if run_demo_with_config(config, config_name):
+        if run_backtest_with_config(config, config_name):
             successful_tests += 1
     
-    print(f"\n=== Overall Demo Summary ===")
+    print(f"\n=== Demo Summary ===")
     print(f"Total configurations tested: {total_tests}")
     print(f"Successful tests: {successful_tests}")
     print(f"Failed tests: {total_tests - successful_tests}")
@@ -237,5 +227,70 @@ def run_demo():
         print(f"\n⚠️  {total_tests - successful_tests} configurations failed")
 
 
+def demo_custom_configuration():
+    """Demonstrate creating custom configurations programmatically."""
+    print("\n=== Custom Configuration Demo ===")
+    
+    # Create a custom configuration
+    custom_config = SMCStrategyConfig(
+        name="Custom SMC",
+        description="My custom configuration",
+        htf_timeframe="1h",
+        ltf_timeframe="5m",
+        indicators={
+            'rsi': {'enabled': True, 'period': 21, 'overbought': 75, 'oversold': 25},
+            'macd': {'enabled': True, 'fast_period': 8, 'slow_period': 21, 'signal_period': 5},
+            'bbands': {'enabled': False},
+            'stochastic': {'enabled': False},
+            'volume': {'enabled': True, 'period': 15},
+            'atr': {'enabled': True, 'period': 10}
+        },
+        filters={
+            'rsi': {'enabled': True, 'min_confidence': 0.5},
+            'volume': {'enabled': True, 'min_volume_ratio': 1.1},
+            'bbands': {'enabled': False},
+            'macd': {'enabled': True, 'signal_cross': True},
+            'stochastic': {'enabled': False},
+            'min_filters_required': 2
+        },
+        smc_elements={
+            'order_blocks': {'enabled': True, 'lookback_bars': 18, 'volume_threshold': 1.8},
+            'fair_value_gaps': {'enabled': True, 'min_gap_pct': 0.8},
+            'liquidity_pools': {'enabled': True, 'swing_threshold': 0.025},
+            'break_of_structure': {'enabled': True, 'confirmation_bars': 2}
+        },
+        risk_management={
+            'risk_per_trade': 0.015,
+            'min_risk_reward': 3.5,
+            'max_positions': 4,
+            'sl_buffer_atr': 0.18
+        }
+    )
+    
+    print("Created custom configuration:")
+    print(f"  Name: {custom_config.name}")
+    print(f"  Description: {custom_config.description}")
+    print(f"  Timeframes: {custom_config.htf_timeframe} / {custom_config.ltf_timeframe}")
+    print(f"  RSI Period: {custom_config.indicators.rsi.period}")
+    print(f"  MACD Fast Period: {custom_config.indicators.macd.fast_period}")
+    print(f"  Risk per Trade: {custom_config.risk_management.risk_per_trade:.1%}")
+    
+    # Test the custom configuration
+    print("\nTesting custom configuration...")
+    run_backtest_with_config(custom_config, "Custom")
+
+
 if __name__ == "__main__":
-    run_demo()
+    try:
+        # Run the main demo
+        demo_configuration_system()
+        
+        # Run custom configuration demo
+        demo_custom_configuration()
+        
+        print("\n=== Demo Completed Successfully! ===")
+        
+    except Exception as e:
+        print(f"\nError during demonstration: {e}")
+        import traceback
+        traceback.print_exc()
